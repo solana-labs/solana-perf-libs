@@ -1,0 +1,21 @@
+/*
+ * This file contains Solana's SGX enclave interface.
+ */
+
+enclave {
+    from "sgx_tkey_exchange.edl" import *;
+    include "sgx_key_exchange.h"
+    include "sgx_trts.h"
+
+   trusted {
+      public sgx_status_t init(
+          uint32_t key_len,
+          [out, size=key_len] uint8_t* pubkey);
+
+      public sgx_status_t sign(
+          uint32_t msg_len,
+          [in, size=msg_len] uint8_t* msg,
+          uint32_t sig_len,
+          [out, size=sig_len] uint8_t* signature);
+   };
+};
