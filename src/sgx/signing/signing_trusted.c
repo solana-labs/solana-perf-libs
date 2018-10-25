@@ -4,20 +4,12 @@
 
 #include <stdbool.h>
 #include <string.h>
+
+#include "ed25519.h"
 #include "signing_t.h"
 
 static bool initialized;
 static uint8_t public_key[32], private_key[64];
-
-void ed25519_create_keypair(unsigned char* public_key,
-                            unsigned char* private_key,
-                            const unsigned char* seed);
-
-void ed25519_sign(unsigned char* signature,
-                  const unsigned char* message,
-                  size_t message_len,
-                  const unsigned char* public_key,
-                  const unsigned char* private_key);
 
 sgx_status_t init(uint32_t keylen, uint8_t* pubkey) {
   if (keylen < sizeof(public_key)) {
