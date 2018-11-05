@@ -11,6 +11,9 @@
 static bool initialized;
 static uint8_t public_key[32], private_key[64];
 
+/* This function creates a new public/private keypair in
+   enclave trusted space.
+*/
 sgx_status_t init(uint32_t keylen, uint8_t* pubkey) {
   if (keylen < sizeof(public_key)) {
     return SGX_ERROR_INVALID_PARAMETER;
@@ -30,6 +33,8 @@ sgx_status_t init(uint32_t keylen, uint8_t* pubkey) {
   return SGX_SUCCESS;
 }
 
+/* This function signs the msg using private key.
+ */
 sgx_status_t sign(uint32_t msg_len,
                   uint8_t* msg,
                   uint32_t sig_len,
