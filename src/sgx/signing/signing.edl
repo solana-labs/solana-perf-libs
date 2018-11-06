@@ -9,11 +9,11 @@ enclave {
     include "signing_internal.h"
 
    trusted {
-      public sgx_status_t init(
+      public sgx_status_t init_sgx_ed25519(
           uint32_t key_len,
           [out, size=key_len] uint8_t* pubkey);
 
-      public sgx_status_t sign(
+      public sgx_status_t sign_sgx_ed25519(
           uint32_t msg_len,
           [in, size=msg_len] const uint8_t* msg,
           uint32_t sig_len,
