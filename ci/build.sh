@@ -13,6 +13,7 @@ echo --- Build
 
   ci/docker-run.sh solanalabs/sgxsdk ./src/sgx-ecc-ed25519/build.sh
   ci/docker-run.sh solanalabs/sgxsdk ./src/sgx/signing/build.sh
+  ci/docker-run.sh solanalabs/sgxsdk ./src/sgx/test/build.sh
 
   cd dist
   git rev-parse HEAD | tee solana-perf-HEAD.txt
