@@ -9,7 +9,8 @@
 #include "signing_t.h"
 
 static bool initialized;
-static uint8_t public_key[32], private_key[64];
+static uint8_t public_key[ED25519_PUB_KEY_LEN],
+    private_key[ED25519_PRIV_KEY_LEN];
 
 /* This function creates a new public/private keypair in
    enclave trusted space.
@@ -19,7 +20,7 @@ sgx_status_t init(uint32_t keylen, uint8_t* pubkey) {
     return SGX_ERROR_INVALID_PARAMETER;
   }
 
-  uint8_t seed[32];
+  uint8_t seed[ED25519_SEED_LEN];
   sgx_status_t status = sgx_read_rand(seed, sizeof(seed));
   if (SGX_SUCCESS != status) {
     return status;
@@ -36,14 +37,14 @@ sgx_status_t init(uint32_t keylen, uint8_t* pubkey) {
 /* This function signs the msg using private key.
  */
 sgx_status_t sign(uint32_t msg_len,
-                  uint8_t* msg,
+                  const uint8_t* msg,
                   uint32_t sig_len,
                   uint8_t* signature) {
   if (!initialized) {
     return SGX_ERROR_INVALID_STATE;
   }
 
-  if (sig_len < 64) {
+  if (sig_len < ED25519_SIGNATURE_LEN) {
     return SGX_ERROR_INVALID_PARAMETER;
   }
 

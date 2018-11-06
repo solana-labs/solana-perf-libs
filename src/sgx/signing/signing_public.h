@@ -1,5 +1,4 @@
-#ifndef SIGNING_PUBLIC_H_
-#define SIGNING_PUBLIC_H_
+#pragma once
 
 #include "sgx_error.h"
 
@@ -25,12 +24,10 @@ sgx_status_t init_ed25519(const char* enclave_file,
    This function must only be called after init_ed25519() function.
 */
 sgx_status_t sign_ed25519(uint32_t msg_len,
-                          uint8_t* msg,
+                          const uint8_t* msg,
                           uint32_t sig_len,
                           uint8_t* signature);
 
 #ifdef __cplusplus
 }
-#endif
-
 #endif

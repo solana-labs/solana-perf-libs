@@ -14,7 +14,8 @@
 static bool initialized = false;
 static bool use_enclave = false;
 static sgx_enclave_id_t eid;
-static uint8_t public_key[32], private_key[64];
+static uint8_t public_key[ED25519_PUB_KEY_LEN],
+    private_key[ED25519_PRIV_KEY_LEN];
 
 /* This function generates a random buffer of size length */
 static void untrusted_read_rand(unsigned char* val, size_t length) {
@@ -43,7 +44,7 @@ static sgx_status_t init_untrusted(uint32_t keylen, uint8_t* pubkey) {
       lt->tm_sec | lt->tm_min << 8 | lt->tm_hour << 16 | lt->tm_mday << 24;
   srand(rand_seed);
 
-  uint8_t seed[32];
+  uint8_t seed[ED25519_SEED_LEN];
   untrusted_read_rand(seed, sizeof(seed));
   ed25519_create_keypair(public_key, private_key, seed);
   memcpy(pubkey, public_key, sizeof(public_key));
@@ -58,14 +59,14 @@ static sgx_status_t init_untrusted(uint32_t keylen, uint8_t* pubkey) {
    does not support SGX.
 */
 static sgx_status_t sign_untrusted(uint32_t msg_len,
-                                   uint8_t* msg,
+                                   const uint8_t* msg,
                                    uint32_t sig_len,
                                    uint8_t* signature) {
   if (!initialized) {
     return SGX_ERROR_INVALID_STATE;
   }
 
-  if (sig_len < 64) {
+  if (sig_len < ED25519_SIGNATURE_LEN) {
     return SGX_ERROR_INVALID_PARAMETER;
   }
 
@@ -111,7 +112,7 @@ sgx_status_t init_ed25519(const char* enclave_file,
    This function must only be called after init_ed25519() function.
 */
 sgx_status_t sign_ed25519(uint32_t msg_len,
-                          uint8_t* msg,
+                          const uint8_t* msg,
                           uint32_t sig_len,
                           uint8_t* signature) {
   if (use_enclave) {
