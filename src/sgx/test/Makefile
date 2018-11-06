@@ -17,7 +17,7 @@ run: all
 
 $(OUT)/signing_test: $(C_Objects)
 	@mkdir -p $(OUT)
-	$(CC) $^ -o $@ -L$(OUT) -L$(LIBS_PATH) -lsigning -led25519.static
+	$(CC) $^ -o $@ -L$(OUT) -L$(LIBS_PATH) -L$(SGX_SDK)/lib64 -lsigning -led25519.static
 
 clean:
 	@rm -rf $(C_Objects) $(OUT)/signing_test
