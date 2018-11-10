@@ -39,10 +39,16 @@ sgx_status_t init_ed25519(const char* enclave_file,
                           uint32_t lockout_max_depth,
                           ed25519_context_t* pctxt);
 
+/* This function returns the sealed data (private key and associated
+   informatio). The sealed data can be used to reinit the enclave using
+   init_ed25519_from_data().
+*/
 sgx_status_t get_ed25519_data(ed25519_context_t* pctxt,
                               uint32_t* datalen,
                               uint8_t* data);
 
+/* This function reinitializes the enclave using sealed data.
+ */
 sgx_status_t init_ed25519_from_data(ed25519_context_t* pctxt,
                                     uint32_t datalen,
                                     uint8_t* data,
