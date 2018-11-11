@@ -2,8 +2,10 @@
 
 cd "$(dirname "$0")/.."
 
-export LD_LIBRARY_PATH=/usr/local/cuda/lib64
-export PATH=$PATH:$HOME/.cargo/bin/:/usr/local/cuda/bin
+: "${CUDA_HOME:=/usr/local/cuda-9.2}"
+
+export LD_LIBRARY_PATH=$CUDA_HOME/lib64
+export PATH=$PATH:$HOME/.cargo/bin/:$CUDA_HOME/bin
 
 echo --- Build
 (
@@ -16,7 +18,7 @@ echo --- Build
 
   cd dist
   git rev-parse HEAD | tee solana-perf-HEAD.txt
-  cp -f /usr/local/cuda/version.txt cuda-version.txt
+  cp -f $CUDA_HOME/version.txt cuda-version.txt
   tar zcvf ../solana-perf.tgz *
 )
 
