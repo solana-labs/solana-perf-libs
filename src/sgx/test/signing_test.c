@@ -47,8 +47,9 @@ int main(int argc, char* argv[]) {
     return -1;
   }
 
-  status = init_ed25519_from_data(&ctxt, datalen, sealed_data, lockout_period,
-                                  lockout_multiplier, lockout_max_depth);
+  status =
+      init_ed25519_from_data(&ctxt, datalen, sealed_data, 1, lockout_period,
+                             lockout_multiplier, lockout_max_depth);
   free(sealed_data);
   if (SGX_SUCCESS != status) {
     printf("Failed in init_ed25519_from_data. Error %d\n", status);

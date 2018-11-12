@@ -52,6 +52,7 @@ sgx_status_t get_ed25519_data(ed25519_context_t* pctxt,
 sgx_status_t init_ed25519_from_data(ed25519_context_t* pctxt,
                                     uint32_t datalen,
                                     uint8_t* data,
+                                    uint32_t update_lockout_params,
                                     uint32_t lockout_period,
                                     uint32_t lockout_multiplier,
                                     uint32_t lockout_max_depth);

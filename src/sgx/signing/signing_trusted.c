@@ -106,6 +106,7 @@ sgx_status_t get_sgx_ed25519_data(uint32_t data_size,
 
 sgx_status_t init_sgx_ed25519_from_data(uint32_t data_size,
                                         uint8_t* sealed_data,
+                                        uint32_t update_lockout_params,
                                         uint32_t lockout_period,
                                         uint32_t lockout_multiplier,
                                         uint32_t lockout_max_depth,
@@ -133,10 +134,11 @@ sgx_status_t init_sgx_ed25519_from_data(uint32_t data_size,
          sizeof(g_signing_params.public_key));
 
   g_signing_params.initialized = true;
-  g_signing_params.lockout_max_depth = lockout_max_depth;
-  g_signing_params.lockout_multiplier = lockout_multiplier;
-  g_signing_params.lockout_period = lockout_period;
-
+  if (update_lockout_params != 0) {
+    g_signing_params.lockout_max_depth = lockout_max_depth;
+    g_signing_params.lockout_multiplier = lockout_multiplier;
+    g_signing_params.lockout_period = lockout_period;
+  }
   return SGX_SUCCESS;
 }
 
