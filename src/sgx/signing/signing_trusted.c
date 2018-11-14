@@ -19,6 +19,8 @@ typedef struct signing_parameters {
   uint32_t lockout_period;
   uint32_t lockout_multiplier;
   uint32_t lockout_max_depth;
+  sgx_mc_uuid_t counter;
+  uint32_t counter_value;
 } signing_parameters_t;
 
 static signing_parameters_t g_signing_params;
@@ -58,8 +60,25 @@ sgx_status_t init_sgx_ed25519(uint32_t lockout_period,
     return SGX_ERROR_INVALID_PARAMETER;
   }
 
+  sgx_status_t status = SGX_SUCCESS;
+  int busy_retry_times = 3;
+  do {
+    status = sgx_create_pse_session();
+  } while (status == SGX_ERROR_BUSY && (busy_retry_times-- > 0));
+
+  if (SGX_SUCCESS != status) {
+    return status;
+  }
+
+  status = sgx_create_monotonic_counter(&g_signing_params.counter,
+                                        &g_signing_params.counter_value);
+  sgx_close_pse_session();
+  if (SGX_SUCCESS != status) {
+    return status;
+  }
+
   uint8_t seed[ED25519_SEED_LEN];
-  sgx_status_t status = sgx_read_rand(seed, sizeof(seed));
+  status = sgx_read_rand(seed, sizeof(seed));
   if (SGX_SUCCESS != status) {
     return status;
   }
@@ -126,6 +145,36 @@ sgx_status_t init_sgx_ed25519_from_data(uint32_t data_size,
 
   if (datalen != sizeof(data)) {
     return SGX_ERROR_INVALID_PARAMETER;
+  }
+
+  int busy_retry_times = 3;
+  do {
+    status = sgx_create_pse_session();
+  } while (status == SGX_ERROR_BUSY && (busy_retry_times-- > 0));
+
+  if (SGX_SUCCESS != status) {
+    return status;
+  }
+
+  uint32_t counter_value = 0xffffffff;
+  status =
+      sgx_read_monotonic_counter(&g_signing_params.counter, &counter_value);
+  if (SGX_SUCCESS != status) {
+    sgx_close_pse_session();
+    return status;
+  }
+
+  if (counter_value != g_signing_params.counter_value) {
+    sgx_close_pse_session();
+    return SGX_ERROR_INVALID_PARAMETER;
+  }
+
+  status = sgx_increment_monotonic_counter(&g_signing_params.counter,
+                                           &g_signing_params.counter_value);
+
+  sgx_close_pse_session();
+  if (SGX_SUCCESS != status) {
+    return status;
   }
 
   memcpy(&g_signing_params, &data, sizeof(g_signing_params));

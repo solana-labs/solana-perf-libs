@@ -18,8 +18,8 @@ typedef struct ed25519_context {
 
 typedef struct history_entry {
   uint32_t num_hashes;
-  uint32_t optional_input_hash;
-  uint32_t result_hash;
+  uint32_t optional_input_hash[4];
+  uint32_t result_hash[4];
 } history_entry_t;
 
 /* This function initializes SGX enclave. It loads enclave_file
