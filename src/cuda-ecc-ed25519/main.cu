@@ -69,6 +69,7 @@ static void* verify_proc(void* ctx) {
     return NULL;
 }
 
+// Use the cuda allocator
 const static bool USE_CUDA_ALLOC = true;
 
 template<typename T> static void ed25519_alloc(T** ptr, size_t num) {
