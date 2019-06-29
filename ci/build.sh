@@ -39,6 +39,12 @@ echo --- Build SGX
   ci/docker-run.sh solanalabs/sgxsdk src/sgx/build.sh
 )
 
+echo --- Build ISPC
+(
+  set -x
+  ci/docker-run.sh solanalabs/ispc src/poh-simd/build.sh
+)
+
 echo --- Create tarball
 (
   set -x
