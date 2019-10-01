@@ -10,6 +10,8 @@ extern bool g_verbose;
 
 #define ROUND_UP_DIV(x, y) (((x) + (y) - 1) / (y))
 
+#ifndef OPENCL_VARIANT
+
 #define CUDA_CHK(ans) { cuda_assert((ans), __FILE__, __LINE__); }
 
 inline void cuda_assert(cudaError_t err, const char *file, int line)
@@ -20,5 +22,7 @@ inline void cuda_assert(cudaError_t err, const char *file, int line)
         assert(0);
     }
 }
+
+#endif
 
 #endif

@@ -16,10 +16,20 @@ CHACHA_TEST_BIN=cuda_chacha_test
 ECC_TEST_BIN=cuda_ed25519_verify
 LIB=cuda-crypt
 
+CL_ECC_TEST_BIN=cl_ed25519_verify
+CL_LIB=cl-crypt
+
+CL_HEADER_DIR:=opencl-platform
+
 CUDA_HEADER_DIR:=cuda-headers
 CUDA_SHA256_DIR:=cuda-sha256
 
+CXX ?= g++
 CFLAGS+=-DENDIAN_NEUTRAL -DLTC_NO_ASM -I$(CUDA_HEADER_DIR) -I$(CUDA_SHA256_DIR)
+#use -DUSE_RDTSC for Windows compilation
+CL_CFLAGS=-fPIC -std=c++11 -DENDIAN_NEUTRAL -DOPENCL_VARIANT -DLTC_NO_ASM -I$(CUDA_HEADER_DIR) -I$(CUDA_SHA256_DIR) -I$(CL_HEADER_DIR) -Icommon/
+
+CUDA_PATH ?= /usr/local/cuda-9.1
 
 all: $V/$(CHACHA_TEST_BIN) $V/$(ECC_TEST_BIN) $(V)/lib$(LIB).so
 
@@ -49,12 +59,32 @@ $V/gpu_ctx.o: $(addprefix $(ECC_DIR)/,gpu_ctx.cu gpu_ctx.h)
 	@mkdir -p $(@D)
 	$(NVCC) -rdc=true $(CFLAGS) -c $< -o $@
 
+CL_ECC_DIR:=opencl-ecc-ed25519
+
+CL_SIGN_SRCS:=$(CL_ECC_DIR)/sign.cpp $(ECC_DIR)/fe.cu $(ECC_DIR)/ed25519.h
+$V/cl_sign.o: $(CL_SIGN_SRCS)
+	@mkdir -p $(@D)
+	$(CXX) $(CL_CFLAGS) -I$(ECC_DIR) -c $< -o $@
+
+CL_VERIFY_SRCS:=$(CL_ECC_DIR)/verify.cpp $(ECC_DIR)/seed.cu $(ECC_DIR)/ed25519.h
+$V/cl_verify.o: $(CL_VERIFY_SRCS)
+	@mkdir -p $(@D)
+	$(CXX) $(CL_CFLAGS) -I$(ECC_DIR) -c $< -o $@
+	
+$V/cl_gpu_ctx.o: $(addprefix $(CL_ECC_DIR)/,gpu_ctx.cpp gpu_ctx.h)
+	@mkdir -p $(@D)
+	$(CXX) $(CL_CFLAGS) -I$(ECC_DIR) -c $< -o $@
+	
 CHACHA_DIR:=cuda-crypt
 CHACHA_SRCS:=$(addprefix $(CHACHA_DIR)/,chacha_cbc.cu chacha.h common.cu)
 
 $V/chacha_cbc.o: $(CHACHA_SRCS)
 	@mkdir -p $(@D)
 	$(NVCC) -rdc=true $(CFLAGS) -c $< -o $@
+
+$V/cl_init_platform.o: opencl-platform/cl_init_platform.cpp
+	@mkdir -p $(@D)
+	$(CXX) $(CL_CFLAGS) -c $< -o $@
 
 AES_SRCS:=$(addprefix $(CHACHA_DIR)/,aes_cbc.cu aes_core.cu modes_lcl.h common.cu)
 
@@ -68,6 +98,24 @@ POH_SRCS:=$(addprefix $(POH_DIR)/,poh_verify.cu)
 $V/poh_verify.o: $(POH_SRCS)
 	@mkdir -p $(@D)
 	$(NVCC) -rdc=true $(CFLAGS) -c $< -o $@
+
+CL_CPU_GPU_OBJS=$(addprefix $V/,cl_init_platform.o cl_verify.o cl_gpu_ctx.o cl_sign.o)
+
+$V/cl_crypt-dlink.o: $(CL_CPU_GPU_OBJS)
+	ar rvs $@ $^
+
+$V/lib$(CL_LIB).a: $V/cl_crypt-dlink.o $(CL_CPU_GPU_OBJS)
+	ar rcs $@ $^
+
+$V/lib$(CL_LIB).so: $V/cl_crypt-dlink.o $(CL_CPU_GPU_OBJS)
+	$(CXX) -shared --shared $^ -o $@
+
+$V/cl_ecc_main.o: $(CL_ECC_DIR)/main.cpp $(ECC_DIR)/ed25519.h
+	@mkdir -p $(@D)
+	$(CXX) $(CL_CFLAGS) -I$(ECC_DIR) -c $< -o $@
+
+$V/$(CL_ECC_TEST_BIN): $V/cl_ecc_main.o $V/lib$(CL_LIB).so
+	$(CXX) $(CL_CFLAGS) -Wl,-v -L$(CUDA_PATH)/lib64 -L$V -lpthread $^ -lOpenCL -o $@
 
 CPU_GPU_OBJS=$(addprefix $V/,chacha_cbc.o aes_cbc.o verify.o poh_verify.o gpu_ctx.o sign.o seed.o keypair.o)
 
