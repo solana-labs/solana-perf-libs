@@ -12,6 +12,10 @@
 #include "fixedint.h"
 #include "sha512.h"
 
+#ifndef UINT64_C
+#define UINT64_C uint64_t
+#endif
+
 #ifdef __CUDA_ARCH__
 #define K_DEF __device__
 #else

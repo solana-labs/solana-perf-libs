@@ -12,6 +12,13 @@
   LTC_SHA256 by Tom St Denis
 */
 
+#ifndef __CUDACC__
+
+#define __device__
+#define __host__
+
+#endif
+
 #include "tomcrypt_macros.h"
 
 
