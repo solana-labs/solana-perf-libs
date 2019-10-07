@@ -109,19 +109,26 @@ __global__ void ed25519_verify_kernel(const uint8_t* packets,
                                       uint32_t* signature_offsets,
                                       uint32_t* message_start_offsets,
                                       size_t num_keys,
-                                      uint8_t* out)
+                                      uint8_t* out,
+                                      unsigned char* pubkey_override)
 {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i < num_keys) {
         uint32_t message_start_offset = message_start_offsets[i];
         uint32_t signature_offset = signature_offsets[i];
-        uint32_t public_key_offset = public_key_offsets[i];
         uint32_t message_len = message_lens[i];
+        const unsigned char* pubkey;
+        if (pubkey_override != NULL) {
+            pubkey = pubkey_override;
+        } else {
+            uint32_t public_key_offset = public_key_offsets[i];
+            pubkey = &packets[public_key_offset];
+        }
 
         out[i] = ed25519_verify_device(&packets[signature_offset],
                                        &packets[message_start_offset],
                                        message_len,
-                                       &packets[public_key_offset]);
+                                       pubkey);
     }
 }
 
@@ -132,6 +139,7 @@ typedef struct {
     uint32_t* message_start_offsets;
     uint32_t* signature_offsets;
     uint32_t* message_lens;
+    unsigned char* pubkey_override;
 
     size_t num;
     size_t num_signatures;
@@ -196,7 +204,8 @@ void ed25519_verify_many(const gpu_Elems* elems,
                          const uint32_t* signature_offsets,
                          const uint32_t* message_start_offsets,
                          uint8_t* out,
-                         uint8_t use_non_default_stream)
+                         uint8_t use_non_default_stream,
+                         unsigned char* pubkey)
 {
     LOG("Starting verify_many: num_elems: %d total_signatures: %d total_packets: %d message_size: %d\n",
         num_elems, total_signatures, total_packets, message_size);
@@ -273,7 +282,17 @@ void ed25519_verify_many(const gpu_Elems* elems,
         stream = cur_ctx->stream;
     }
 
-    CUDA_CHK(cudaMemcpyAsync(cur_ctx->public_key_offsets, public_key_offsets, offsets_size, cudaMemcpyHostToDevice, stream));
+    unsigned char* pubkey_override = NULL;
+    if (pubkey != NULL) {
+        if (cur_ctx->pubkey_override == NULL) {
+            CUDA_CHK(cudaMalloc(&cur_ctx->pubkey_override, PUB_KEY_SIZE));
+        }
+        pubkey_override = cur_ctx->pubkey_override;
+        CUDA_CHK(cudaMemcpyAsync(pubkey_override, pubkey, PUB_KEY_SIZE, cudaMemcpyHostToDevice, stream));
+    } else {
+        CUDA_CHK(cudaMemcpyAsync(cur_ctx->public_key_offsets, public_key_offsets, offsets_size, cudaMemcpyHostToDevice, stream));
+    }
+
     CUDA_CHK(cudaMemcpyAsync(cur_ctx->signature_offsets, signature_offsets, offsets_size, cudaMemcpyHostToDevice, stream));
     CUDA_CHK(cudaMemcpyAsync(cur_ctx->message_start_offsets, message_start_offsets, offsets_size, cudaMemcpyHostToDevice, stream));
     CUDA_CHK(cudaMemcpyAsync(cur_ctx->message_lens, message_lens, offsets_size, cudaMemcpyHostToDevice, stream));
@@ -300,7 +319,8 @@ void ed25519_verify_many(const gpu_Elems* elems,
                              cur_ctx->signature_offsets,
                              cur_ctx->message_start_offsets,
                              cur_ctx->num_signatures,
-                             cur_ctx->out);
+                             cur_ctx->out,
+                             pubkey_override);
     CUDA_CHK(cudaPeekAtLastError());
 
     cudaError_t err = cudaMemcpyAsync(out, cur_ctx->out, out_size, cudaMemcpyDeviceToHost, stream);
@@ -328,6 +348,7 @@ void ed25519_free_gpu_mem() {
             CUDA_CHK(cudaFree(cur_ctx->public_key_offsets));
             CUDA_CHK(cudaFree(cur_ctx->signature_offsets));
             CUDA_CHK(cudaFree(cur_ctx->message_start_offsets));
+            CUDA_CHK(cudaFree(cur_ctx->pubkey_override));
             if (cur_ctx->stream != 0) {
                 CUDA_CHK(cudaStreamDestroy(cur_ctx->stream));
             }

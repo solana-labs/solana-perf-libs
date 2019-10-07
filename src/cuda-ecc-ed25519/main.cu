@@ -64,7 +64,8 @@ static void* verify_proc(void* ctx) {
                             vctx->signature_offsets,
                             vctx->message_start_offsets,
                             vctx->out_h,
-                            vctx->use_non_default_stream);
+                            vctx->use_non_default_stream,
+                            NULL);
     }
     return NULL;
 }
