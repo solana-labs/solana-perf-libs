@@ -60,6 +60,8 @@ extern cl_kernel cl_aes_cbc_enc;
 extern cl_kernel cl_aes_cbc_dec;
 extern cl_kernel init_sha256_state_kernel;
 extern cl_kernel end_sha256_state_kernel;
+extern cl_kernel ed25519_verify_kernel;
+extern cl_kernel poh_verify_kernel;
 
 // override any CUDA function qualifiers
 #define __host__

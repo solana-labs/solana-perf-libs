@@ -16,11 +16,15 @@ CHACHA_TEST_BIN=cuda_chacha_test
 ECC_TEST_BIN=cuda_ed25519_verify
 LIB=cuda-crypt
 
+CL_CHACHA_TEST_BIN=cl_chacha_test
+CL_ECC_TEST_BIN=cl_ed25519_verify
+CL_LIB=cl-crypt
+
 CUDA_HEADER_DIR:=cuda-headers
 CUDA_SHA256_DIR:=cuda-sha256
 
 CFLAGS+=-DENDIAN_NEUTRAL -DLTC_NO_ASM -I$(CUDA_HEADER_DIR) -I$(CUDA_SHA256_DIR)
-CL_CFLAGS=-DENDIAN_NEUTRAL -DLTC_NO_ASM -I$(CUDA_HEADER_DIR) -I$(CUDA_SHA256_DIR)
+CL_CFLAGS=-std=c++11 -DENDIAN_NEUTRAL -DLTC_NO_ASM -I$(CUDA_HEADER_DIR) -I$(CUDA_SHA256_DIR)
 
 all: $V/$(CHACHA_TEST_BIN) $V/$(ECC_TEST_BIN) $(V)/lib$(LIB).so
 
@@ -30,6 +34,13 @@ VERIFY_SRCS:=$(addprefix $(ECC_DIR)/,verify.cu seed.cu sha512.cu ge.cu sc.cu fe.
 $V/verify.o: $(VERIFY_SRCS)
 	@mkdir -p $(@D)
 	$(NVCC) -rdc=true $(CFLAGS) -c $< -o $@
+	
+CL_ECC_DIR:=opencl-ecc-ed25519
+CL_VERIFY_SRCS:=$(addprefix $(CL_ECC_DIR)/,verify.cpp seed.cu sha512.cu ge.cu sc.cu fe.cu sign.cu keypair.cu common.cu ed25519.h)
+
+$V/cl_verify.o: $(CL_VERIFY_SRCS)
+	@mkdir -p $(@D)
+	g++ $(CL_CFLAGS) -c $< -o $@
 
 CHACHA_DIR:=cuda-crypt
 CHACHA_SRCS:=$(addprefix $(CHACHA_DIR)/,chacha_cbc.cu chacha.h common.cu)
@@ -73,6 +84,29 @@ POH_SRCS:=$(addprefix $(POH_DIR)/,poh_verify.cu)
 $V/poh_verify.o: $(POH_SRCS)
 	@mkdir -p $(@D)
 	$(NVCC) -rdc=true $(CFLAGS) -c $< -o $@
+	
+CL_POH_DIR:=opencl-poh-verify
+CL_POH_SRCS:=$(addprefix $(CL_POH_DIR)/,poh_verify.cpp)
+
+$V/cl_poh_verify.o: $(CL_POH_SRCS)
+	@mkdir -p $(@D)
+	g++ $(CL_CFLAGS) -c $< -o $@
+
+$V/cl_crypt-dlink.o: $V/cl_init_platform.o $V/cl_chacha_cbc.o $V/cl_aes_cbc.o $V/cl_verify.o $V/cl_poh_verify.o
+	ar rvs $@ $^
+
+$V/lib$(CL_LIB).a: $V/cl_crypt-dlink.o $V/cl_init_platform.o $V/cl_chacha_cbc.o $V/cl_aes_cbc.o $V/cl_verify.o $V/cl_poh_verify.o
+	ar rcs $@ $^
+	
+$V/lib$(CL_LIB).so: $V/cl_crypt-dlink.o $V/cl_init_platform.o $V/cl_chacha_cbc.o $V/cl_aes_cbc.o $V/cl_verify.o $V/cl_poh_verify.o
+	g++ -shared --shared $^ -o $@
+	
+$V/cl_ecc_main.o: $(addprefix $(CL_ECC_DIR)/,main.cpp ed25519.h)
+	@mkdir -p $(@D)
+	g++ $(CL_CFLAGS) -c $< -o $@
+	
+$V/$(CL_ECC_TEST_BIN): $V/cl_ecc_main.o $V/lib$(CL_LIB).a
+	g++ $(CL_CFLAGS) -Wl,-v -L/usr/local/cuda-9.1/lib64 -L$V -lpthread -lOpenCL $^ -o $@
 
 $V/crypt-dlink.o: $V/chacha_cbc.o $V/aes_cbc.o $V/verify.o $V/poh_verify.o
 	$(NVCC) -Xcompiler "-fPIC" --gpu-architecture=compute_61 --device-link $^ --output-file $@

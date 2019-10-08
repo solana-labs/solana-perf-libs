@@ -8,6 +8,20 @@
 
 #include "gpu_common.h"
 
+//const char *kernels_aes_cbc_src = R""""(
+//)"""";
+//const char *kernels_chacha_cbc_src = R""""(
+//)"""";
+const char *kernels_verify_src = R""""(
+)"""";
+
+// OpenCL kernel source code
+#include "kernels_aes_cbc.h"
+#include "kernels_chacha_cbc.h"
+
+// TODO internal compiler error problem
+//#include "kernels_verify.h"
+
 bool cl_is_init = false;
 
 cl_context context;
@@ -18,6 +32,37 @@ cl_kernel cl_chacha20_cbc128_encrypt_sample_kernel;
 cl_kernel cl_chacha_ctr_encrypt_kernel;
 cl_kernel cl_aes_cbc_enc;
 cl_kernel cl_aes_cbc_dec;
+cl_kernel init_sha256_state_kernel;
+cl_kernel end_sha256_state_kernel;
+cl_kernel ed25519_verify_kernel;
+cl_kernel poh_verify_kernel;
+
+/**
+ * User/host function, check OpenCL function return code
+ */
+int CL_ERR(int cl_ret)
+{
+	if(cl_ret != CL_SUCCESS){
+		cout << endl << cl_get_string_err(cl_ret) << endl;
+		return 1;
+	}
+	return 0;
+}
+
+/**
+ * User/host function, check OpenCL compilation return code
+ */
+int CL_COMPILE_ERR(int cl_ret,
+                  cl_program program,
+                  cl_device_id device)
+{
+	if(cl_ret != CL_SUCCESS){
+		cout << endl << cl_get_string_err(cl_ret) << endl;
+		cl_get_compiler_err_log(program, device);
+		return 1;
+	}
+	return 0;
+}
 
 /**
 * Read kernel from file
@@ -172,7 +217,7 @@ bool cl_check_init(void) {
 
         /* get num of available OpenCL devices type ALL on the selected platform */
         if(clGetDeviceIDs(platform_list[platf], 
-            CL_DEVICE_TYPE_ALL, 0, NULL, &device_num) != CL_SUCCESS) {
+            CL_DEVICE_TYPE_GPU, 0, NULL, &device_num) != CL_SUCCESS) {
             device_num = 0;
             continue;
         }
@@ -225,12 +270,15 @@ bool cl_check_init(void) {
     CL_ERR( ret );
 
     /* retrieve kernel source */
-    read_kernel("cl_list_kernels.cl", kernel_src);
-    const char* kernel_c_str = kernel_src.c_str();
+    kernel_src += kernels_aes_cbc_src;
+	kernel_src += kernels_chacha_cbc_src;
+	kernel_src += kernels_verify_src;
+	
+	const char* kernel_src_cstr = kernel_src.c_str();
 
     /* create kernel program from source */
     program = clCreateProgramWithSource(context, 1,
-        &kernel_c_str, NULL, &ret);
+        &kernel_src_cstr, NULL, &ret);
     CL_ERR( ret );
 
     /* compile the program for the given set of devices */
@@ -257,6 +305,12 @@ bool cl_check_init(void) {
     CL_ERR( ret );
 
     end_sha256_state_kernel = clCreateKernel(program, "end_sha256_state_kernel", &ret);
+    CL_ERR( ret );
+	
+	ed25519_verify_kernel = clCreateKernel(program, "ed25519_verify_kernel", &ret);
+    CL_ERR( ret );
+	
+	poh_verify_kernel = clCreateKernel(program, "poh_verify_kernel", &ret);
     CL_ERR( ret );
 
     // set init to done
