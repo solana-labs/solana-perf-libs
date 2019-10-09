@@ -16,8 +16,8 @@ const char *kernels_aes_cbc_src = R""""(
 
 #define BLOCK_SIZE (4 * 1024)
 
-typedef void (*block128_f) (const unsigned char in[16],
-                            unsigned char out[16], const void *key);
+typedef void (*block128_f) (__global const unsigned char in[16],
+                             unsigned char out[16], __global const void *key);
 
 typedef void (*cbc128_f) (const unsigned char *in, unsigned char *out,
                           size_t len, const void *key,
@@ -279,14 +279,6 @@ struct ocb128_context {
 #  define PUTU32(ct, st) { (ct)[0] = (u8)((st) >> 24); (ct)[1] = (u8)((st) >> 16); (ct)[2] = (u8)((st) >>  8); (ct)[3] = (u8)(st); }
 # endif
 #endif
-
-# ifdef AES_LONG
-typedef unsigned long u32;
-# else
-typedef unsigned int u32;
-# endif
-typedef unsigned short u16;
-typedef unsigned char u8;
 
 # define MAXKC   (256/32)
 # define MAXKB   (256/8)
@@ -1076,12 +1068,12 @@ int AES_set_decrypt_key(const unsigned char *userKey, const int bits,
  * Encrypt a single block
  * in and out can overlap
  */
-void AES_encrypt(const unsigned char *in,
-                                     unsigned char *out,
-                                     const AES_KEY *key,
-                                     const u32* te) {
+void AES_encrypt(__global unsigned char *in,
+                 __global unsigned char *out,
+				 __global AES_KEY *key,
+				 __global const u32* te) {
 
-    const u32 *rk;
+    __global const u32 *rk;
     u32 s0, s1, s2, s3, t0, t1, t2, t3;
 #ifndef FULL_UNROLL
     int r;
@@ -1286,11 +1278,11 @@ void AES_encrypt(const unsigned char *in,
  * Decrypt a single block
  * in and out can overlap
  */
-void AES_decrypt(const unsigned char *in, unsigned char *out,
-                 const AES_KEY *key)
+void AES_decrypt(__global unsigned char *in, __global unsigned char *out,
+                 __global AES_KEY *key)
 {
 
-    const u32 *rk;
+    __global const u32 *rk;
     u32 s0, s1, s2, s3, t0, t1, t2, t3;
 #ifndef FULL_UNROLL
     int r;
@@ -1519,8 +1511,8 @@ __constant u32 rcon[] = {
 /**
  * Expand the cipher key into the encryption key schedule.
  */
-int AES_set_encrypt_key(const unsigned char *userKey, const int bits,
-                        AES_KEY *key)
+int AES_set_encrypt_key(__global unsigned char *userKey, const int bits,
+                        __global AES_KEY *key)
 {
     u32 *rk;
     int i = 0;
@@ -1620,8 +1612,8 @@ int AES_set_encrypt_key(const unsigned char *userKey, const int bits,
 /**
  * Expand the cipher key into the decryption key schedule.
  */
-int AES_set_decrypt_key(const unsigned char *userKey, const int bits,
-                        AES_KEY *key)
+int AES_set_decrypt_key(__global unsigned char *userKey, const int bits,
+                        __global AES_KEY *key)
 {
 
     u32 *rk;
@@ -1683,13 +1675,13 @@ int AES_set_decrypt_key(const unsigned char *userKey, const int bits,
 # define STRICT_ALIGNMENT 0
 #endif
 
-void aes_cbc128_encrypt(const unsigned char* in, unsigned char* out,
-                                            uint32_t len, const AES_KEY* key,
-                                            unsigned char* ivec,
-                                            const u32* l_te)
+void aes_cbc128_encrypt(__global unsigned char* in, __global unsigned char* out,
+						uint32_t len, __global AES_KEY* key,
+						__global unsigned char* ivec,
+						__global const u32* l_te)
 {
     size_t n;
-    unsigned char *iv = ivec;
+    __global unsigned char *iv = ivec;
 
     if (len == 0)
         return;
@@ -1708,9 +1700,11 @@ void aes_cbc128_encrypt(const unsigned char* in, unsigned char* out,
         }
     } else {
         while (len >= 16) {
-            for (n = 0; n < 16; n += sizeof(size_t))
-                *(size_t *)(out + n) =
-                    *(size_t *)(in + n) ^ *(size_t *)(iv + n);
+            for (n = 0; n < 16; n += sizeof(size_t)) {
+				// TODO verify this
+				*(__global size_t *)(out + n) =
+                    *(__global size_t *)(in + n) ^ *(__global size_t *)(iv + n);
+			}
             AES_encrypt(out, out, key, l_te);
             iv = out;
             len -= 16;
@@ -1738,9 +1732,9 @@ void aes_cbc128_encrypt(const unsigned char* in, unsigned char* out,
 	}
 }
 
-void CRYPTO_cbc128_decrypt(const unsigned char *in, unsigned char *out,
-                           size_t len, const AES_KEY *key,
-                           unsigned char ivec[16], block128_f block)
+void CRYPTO_cbc128_decrypt(__global unsigned char *in, __global unsigned char *out,
+                           size_t len, __global AES_KEY *key,
+                           __global unsigned char ivec[16], block128_f block)
 {
     size_t n;
     union {
@@ -1753,10 +1747,7 @@ void CRYPTO_cbc128_decrypt(const unsigned char *in, unsigned char *out,
 
 #if !defined(OPENSSL_SMALL_FOOTPRINT)
     if (in != out) {
-        unsigned char *iv;// = ivec;
-		for(int i = 0; i < 16; i++) {
-			iv[i] = ivec[i];
-		}
+        __global unsigned char *iv = ivec;
 
         if (STRICT_ALIGNMENT &&
             ((size_t)in | (size_t)out | (size_t)ivec) % sizeof(size_t) != 0) {
@@ -1771,7 +1762,7 @@ void CRYPTO_cbc128_decrypt(const unsigned char *in, unsigned char *out,
             }
         } else if (16 % sizeof(size_t) == 0) { /* always true */
             while (len >= 16) {
-                size_t *out_t = (size_t *)out, *iv_t = (size_t *)iv;
+                __global size_t *out_t = (__global size_t *)out, *iv_t = (__global size_t *)iv;
 
                 (*block) (in, out, key);
                 for (n = 0; n < 16 / sizeof(size_t); n++)
@@ -1804,8 +1795,9 @@ void CRYPTO_cbc128_decrypt(const unsigned char *in, unsigned char *out,
             }
         } else if (16 % sizeof(size_t) == 0) { /* always true */
             while (len >= 16) {
-                size_t c, *out_t = (size_t *)out, *ivec_t = (size_t *)ivec;
-                const size_t *in_t = (const size_t *)in;
+                size_t c;
+				__global size_t *out_t = (__global size_t *)out, *ivec_t = (__global size_t *)ivec;
+                __global const size_t *in_t = (__global const size_t *)in;
 
                 (*block) (in, tmp.c, key);
                 for (n = 0; n < 16 / sizeof(size_t); n++) {
@@ -1840,28 +1832,37 @@ void CRYPTO_cbc128_decrypt(const unsigned char *in, unsigned char *out,
 }
 
 
-void AES_cbc_encrypt(const unsigned char *in, unsigned char *out,
-                     size_t len, const AES_KEY *key,
-                     unsigned char *ivec, const int enc)
+void AES_cbc_encrypt(__global unsigned char *in, __global unsigned char *out,
+                     size_t len, __global AES_KEY *key,
+                     __global unsigned char *ivec, const int enc)
 {
 
     if (enc) {
-        aes_cbc128_encrypt(in, out, len, key, ivec, g_Te0);
+		
+		// TODO fix, store in global memory
+		// performance degradation
+		//__global u32 g_te[256];
+		//for(int i = 0; i < 256; i++) {
+		//	g_te[i] = g_Te0[i];
+		//}
+		
+		// TODO FIXME, BROKEN constant to global memory conversion
+        // aes_cbc128_encrypt(in, out, len, key, ivec, g_Te0);
 	}
     else
         CRYPTO_cbc128_decrypt(in, out, len, key, ivec,
                               (block128_f) AES_decrypt);
 }
 
-void CRYPTO_cbc128_encrypt_kernel(const unsigned char* input, unsigned char* output,
-                                             size_t length, const AES_KEY* keys,
-                                             unsigned char* ivec, uint32_t num_keys,
-                                             unsigned char* sha_state,
-                                             uint32_t* sample_idx,
+__kernel void CRYPTO_cbc128_encrypt_kernel(__global unsigned char* input, __global unsigned char* output,
+                                             uint32_t length, __global AES_KEY* keys,
+                                             __global unsigned char* ivec, uint32_t num_keys,
+                                             __global unsigned char* sha_state,
+                                             __global uint32_t* sample_idx,
                                              uint32_t sample_len,
                                              uint32_t block_offset)
 {
-    size_t i = (size_t)(get_global_id(0));
+    uint32_t i = (uint32_t)(get_global_id(0));
 
 //#if 0
 #ifdef __CUDA_ARCH__
@@ -1870,11 +1871,20 @@ void CRYPTO_cbc128_encrypt_kernel(const unsigned char* input, unsigned char* out
     l_te[tid] = g_Te0[tid];
     __syncthreads();
 #else
-    const u32* l_te = g_Te0;
+    //__local u32 l_te[256];
+	//l_te[i] = g_Te0[get_local_id(0)];
+	//barrier(CLK_LOCAL_MEM_FENCE);
+	
+	// TODO FIXME
+	// performance degradation
+	//__global u32 g_te[256];
+	//for(int i = 0; i < 256; i++) {
+	//	g_te[i] = g_Te0[i];
+	//}
 #endif
 
-    if (i < num_keys) {
-        aes_cbc128_encrypt(input, &output[i * length], length, &keys[i], &ivec[i * AES_BLOCK_SIZE], l_te);
+    if (i < num_keys) { // TODO FIXME, BROKEN constant to global memory conversion
+        //aes_cbc128_encrypt(input, &output[i * length], length, &keys[i], &ivec[i * AES_BLOCK_SIZE], g_Te0);
 
         /*for (uint32_t j = 0; j < sample_len; j++) {
             if (sample_idx[j] > block_offset && sample_idx[j] < (block_offset + length)) {

@@ -51,8 +51,8 @@ void chacha_cbc_encrypt_many(const unsigned char *in, unsigned char *out,
     output_device = clCreateBuffer(context, CL_MEM_READ_WRITE, output_size, NULL, &ret);
     CL_ERR( ret );
 
-    int num_threads_per_block = 64;
-    int num_blocks = ROUND_UP_DIV(num_keys, num_threads_per_block);
+    size_t num_threads_per_block = 64;
+    size_t num_blocks = ROUND_UP_DIV(num_keys, num_threads_per_block);
 
     perftime_t start, end;
 
@@ -68,16 +68,16 @@ void chacha_cbc_encrypt_many(const unsigned char *in, unsigned char *out,
         /* set OpenCL kernel argument */
         cl_int block_i = i * BLOCK_SIZE;
         
-        CL_ERR( clSetKernelArg(cl_chacha20_cbc128_encrypt_kernel, 0, sizeof(cl_mem), (void *)&in_device) );
-        CL_ERR( clSetKernelArg(cl_chacha20_cbc128_encrypt_kernel, 1, sizeof(cl_mem), (void *)&output_device) );
-        CL_ERR( clSetKernelArg(cl_chacha20_cbc128_encrypt_kernel, 2, sizeof(size_t), (void *)&size) );
-        CL_ERR( clSetKernelArg(cl_chacha20_cbc128_encrypt_kernel, 3, sizeof(cl_mem), (void *)&keys_device) );
-        CL_ERR( clSetKernelArg(cl_chacha20_cbc128_encrypt_kernel, 4, sizeof(cl_mem), (void *)&ivec_device) );
-        CL_ERR( clSetKernelArg(cl_chacha20_cbc128_encrypt_kernel, 5, sizeof(size_t), (void *)&num_keys) );
+        CL_ERR( clSetKernelArg(chacha20_cbc128_encrypt_kernel, 0, sizeof(cl_mem), (void *)&in_device) );
+        CL_ERR( clSetKernelArg(chacha20_cbc128_encrypt_kernel, 1, sizeof(cl_mem), (void *)&output_device) );
+        CL_ERR( clSetKernelArg(chacha20_cbc128_encrypt_kernel, 2, sizeof(cl_uint), (void *)&size) );
+        CL_ERR( clSetKernelArg(chacha20_cbc128_encrypt_kernel, 3, sizeof(cl_mem), (void *)&keys_device) );
+        CL_ERR( clSetKernelArg(chacha20_cbc128_encrypt_kernel, 4, sizeof(cl_mem), (void *)&ivec_device) );
+        CL_ERR( clSetKernelArg(chacha20_cbc128_encrypt_kernel, 5, sizeof(cl_uint), (void *)&num_keys) );
         
         size_t globalSize[2] = {num_blocks, 0};
         size_t localSize[2] = {num_threads_per_block, 0};	
-        ret = clEnqueueNDRangeKernel(cmd_queue, cl_chacha20_cbc128_encrypt_kernel, 1, NULL,
+        ret = clEnqueueNDRangeKernel(cmd_queue, chacha20_cbc128_encrypt_kernel, 1, NULL,
             globalSize, localSize, 0, NULL, NULL);
             CL_ERR( ret );
 
@@ -110,11 +110,11 @@ void chacha_init_sha_state(void* sha_state_arg, uint32_t num_keys)
     sha_state_device = clCreateBuffer(context, CL_MEM_READ_WRITE, sha_state_size, NULL, &ret);
     CL_ERR( ret );
 
-    int num_threads_per_block = 64;
-    int num_blocks = ROUND_UP_DIV(num_keys, num_threads_per_block);
+    size_t num_threads_per_block = 64;
+    size_t num_blocks = ROUND_UP_DIV(num_keys, num_threads_per_block);
     
-    CL_ERR( clSetKernelArg(cl_chacha20_cbc128_encrypt_kernel, 0, sizeof(cl_mem), (void *)&sha_state_device) );
-    CL_ERR( clSetKernelArg(cl_chacha20_cbc128_encrypt_kernel, 1, sizeof(size_t), (void *)&num_keys) );
+    CL_ERR( clSetKernelArg(chacha20_cbc128_encrypt_kernel, 0, sizeof(cl_mem), (void *)&sha_state_device) );
+    CL_ERR( clSetKernelArg(chacha20_cbc128_encrypt_kernel, 1, sizeof(cl_uint), (void *)&num_keys) );
     
     size_t globalSize[2] = {num_blocks, 0};
     size_t localSize[2] = {num_threads_per_block, 0};	
@@ -148,12 +148,12 @@ void chacha_end_sha_state(const void* sha_state_arg, uint8_t* out, uint32_t num_
     
     CL_ERR( clEnqueueWriteBuffer(cmd_queue, sha_state_device, CL_TRUE, 0, sha_state_size, sha_state, 0, NULL, NULL));
 
-    int num_threads_per_block = 64;
-    int num_blocks = ROUND_UP_DIV(num_keys, num_threads_per_block);
+    size_t num_threads_per_block = 64;
+    size_t num_blocks = ROUND_UP_DIV(num_keys, num_threads_per_block);
     
     CL_ERR( clSetKernelArg(end_sha256_state_kernel, 0, sizeof(cl_mem), (void *)&sha_state_device) );
     CL_ERR( clSetKernelArg(end_sha256_state_kernel, 1, sizeof(cl_mem), (void *)&out_device) );
-    CL_ERR( clSetKernelArg(end_sha256_state_kernel, 2, sizeof(size_t), (void *)&num_keys) );
+    CL_ERR( clSetKernelArg(end_sha256_state_kernel, 2, sizeof(cl_uint), (void *)&num_keys) );
     
     size_t globalSize[2] = {num_blocks, 0};
     size_t localSize[2] = {num_threads_per_block, 0};	
@@ -227,8 +227,8 @@ void chacha_cbc_encrypt_many_sample(const uint8_t* in,
     CL_ERR( ret );
     CL_ERR( clEnqueueWriteBuffer(cmd_queue, sha_state_device, CL_TRUE, 0, sha_state_size, sha_state, 0, NULL, NULL));
 
-    int num_threads_per_block = 64;
-    int num_blocks = ROUND_UP_DIV(num_keys, num_threads_per_block);
+    size_t num_threads_per_block = 64;
+    size_t num_blocks = ROUND_UP_DIV(num_keys, num_threads_per_block);
 
     perftime_t start, end;
 
@@ -259,20 +259,20 @@ void chacha_cbc_encrypt_many_sample(const uint8_t* in,
         /* set OpenCL kernel argument */
         cl_int block_i = i * BLOCK_SIZE + starting_block_offset;
 
-        CL_ERR( clSetKernelArg(cl_chacha20_cbc128_encrypt_sample_kernel, 0, sizeof(cl_mem), (void *)&in_device) );
-        CL_ERR( clSetKernelArg(cl_chacha20_cbc128_encrypt_sample_kernel, 1, sizeof(cl_mem), (void *)&output_device) );
-        CL_ERR( clSetKernelArg(cl_chacha20_cbc128_encrypt_sample_kernel, 2, sizeof(size_t), (void *)&size) );
-        CL_ERR( clSetKernelArg(cl_chacha20_cbc128_encrypt_sample_kernel, 3, sizeof(cl_mem), (void *)&keys_device) );
-        CL_ERR( clSetKernelArg(cl_chacha20_cbc128_encrypt_sample_kernel, 4, sizeof(cl_mem), (void *)&ivec_device) );
-        CL_ERR( clSetKernelArg(cl_chacha20_cbc128_encrypt_sample_kernel, 5, sizeof(size_t), (void *)&num_keys) );
-        CL_ERR( clSetKernelArg(cl_chacha20_cbc128_encrypt_sample_kernel, 6, sizeof(cl_mem), (void *)&sha_state_device) );
-        CL_ERR( clSetKernelArg(cl_chacha20_cbc128_encrypt_sample_kernel, 7, sizeof(cl_mem), (void *)&samples_device) );
-        CL_ERR( clSetKernelArg(cl_chacha20_cbc128_encrypt_sample_kernel, 8, sizeof(size_t), (void *)&num_samples) );
-        CL_ERR( clSetKernelArg(cl_chacha20_cbc128_encrypt_sample_kernel, 9, sizeof(size_t), (void *)&block_i ) );
+        CL_ERR( clSetKernelArg(chacha20_cbc128_encrypt_sample_kernel, 0, sizeof(cl_mem), (void *)&in_device) );
+        CL_ERR( clSetKernelArg(chacha20_cbc128_encrypt_sample_kernel, 1, sizeof(cl_mem), (void *)&output_device) );
+        CL_ERR( clSetKernelArg(chacha20_cbc128_encrypt_sample_kernel, 2, sizeof(cl_uint), (void *)&size) );
+        CL_ERR( clSetKernelArg(chacha20_cbc128_encrypt_sample_kernel, 3, sizeof(cl_mem), (void *)&keys_device) );
+        CL_ERR( clSetKernelArg(chacha20_cbc128_encrypt_sample_kernel, 4, sizeof(cl_mem), (void *)&ivec_device) );
+        CL_ERR( clSetKernelArg(chacha20_cbc128_encrypt_sample_kernel, 5, sizeof(cl_uint), (void *)&num_keys) );
+        CL_ERR( clSetKernelArg(chacha20_cbc128_encrypt_sample_kernel, 6, sizeof(cl_mem), (void *)&sha_state_device) );
+        CL_ERR( clSetKernelArg(chacha20_cbc128_encrypt_sample_kernel, 7, sizeof(cl_mem), (void *)&samples_device) );
+        CL_ERR( clSetKernelArg(chacha20_cbc128_encrypt_sample_kernel, 8, sizeof(cl_uint), (void *)&num_samples) );
+        CL_ERR( clSetKernelArg(chacha20_cbc128_encrypt_sample_kernel, 9, sizeof(cl_uint), (void *)&block_i ) );
 
         size_t globalSize[2] = {num_blocks, 0};
         size_t localSize[2] = {num_threads_per_block, 0};	
-        ret = clEnqueueNDRangeKernel(cmd_queue, cl_chacha20_cbc128_encrypt_sample_kernel, 1, NULL,
+        ret = clEnqueueNDRangeKernel(cmd_queue, chacha20_cbc128_encrypt_sample_kernel, 1, NULL,
             globalSize, localSize, 0, NULL, NULL);
 			CL_ERR( ret );
 
@@ -345,8 +345,8 @@ void chacha_ctr_encrypt_many(const unsigned char *in, unsigned char *out,
     output_device = clCreateBuffer(context, CL_MEM_READ_WRITE, output_size, NULL, &ret);
     CL_ERR( ret );
 
-    int num_threads_per_block = 64;
-    int num_blocks = ROUND_UP_DIV(num_keys, num_threads_per_block);
+    size_t num_threads_per_block = 64;
+    size_t num_blocks = ROUND_UP_DIV(num_keys, num_threads_per_block);
 
     perftime_t start, end;
 
@@ -363,20 +363,20 @@ void chacha_ctr_encrypt_many(const unsigned char *in, unsigned char *out,
 
         cl_int block_i = i * BLOCK_SIZE;
 
-        CL_ERR( clSetKernelArg(cl_chacha_ctr_encrypt_kernel, 0, sizeof(cl_mem), (void *)&in_device) );
-        CL_ERR( clSetKernelArg(cl_chacha_ctr_encrypt_kernel, 1, sizeof(cl_mem), (void *)&output_device) );
-        CL_ERR( clSetKernelArg(cl_chacha_ctr_encrypt_kernel, 2, sizeof(size_t), (void *)&size) );
-        CL_ERR( clSetKernelArg(cl_chacha_ctr_encrypt_kernel, 3, sizeof(cl_mem), (void *)&keys_device) );
-        CL_ERR( clSetKernelArg(cl_chacha_ctr_encrypt_kernel, 4, sizeof(cl_mem), (void *)&nonces_device) );
-        CL_ERR( clSetKernelArg(cl_chacha_ctr_encrypt_kernel, 5, sizeof(size_t), (void *)&num_keys) );
-        CL_ERR( clSetKernelArg(cl_chacha_ctr_encrypt_kernel, 6, sizeof(cl_mem), (void *)&sha_state_device) );
-        CL_ERR( clSetKernelArg(cl_chacha_ctr_encrypt_kernel, 7, sizeof(cl_mem), (void *)&samples_device) );
-        CL_ERR( clSetKernelArg(cl_chacha_ctr_encrypt_kernel, 8, sizeof(size_t), (void *)&sample_len) );
-        CL_ERR( clSetKernelArg(cl_chacha_ctr_encrypt_kernel, 9, sizeof(size_t), (void *)&block_i ) );
+        CL_ERR( clSetKernelArg(chacha_ctr_encrypt_kernel, 0, sizeof(cl_mem), (void *)&in_device) );
+        CL_ERR( clSetKernelArg(chacha_ctr_encrypt_kernel, 1, sizeof(cl_mem), (void *)&output_device) );
+        CL_ERR( clSetKernelArg(chacha_ctr_encrypt_kernel, 2, sizeof(cl_uint), (void *)&size) );
+        CL_ERR( clSetKernelArg(chacha_ctr_encrypt_kernel, 3, sizeof(cl_mem), (void *)&keys_device) );
+        CL_ERR( clSetKernelArg(chacha_ctr_encrypt_kernel, 4, sizeof(cl_mem), (void *)&nonces_device) );
+        CL_ERR( clSetKernelArg(chacha_ctr_encrypt_kernel, 5, sizeof(cl_uint), (void *)&num_keys) );
+        CL_ERR( clSetKernelArg(chacha_ctr_encrypt_kernel, 6, sizeof(cl_mem), (void *)&sha_state_device) );
+        CL_ERR( clSetKernelArg(chacha_ctr_encrypt_kernel, 7, sizeof(cl_mem), (void *)&samples_device) );
+        CL_ERR( clSetKernelArg(chacha_ctr_encrypt_kernel, 8, sizeof(cl_uint), (void *)&sample_len) );
+        CL_ERR( clSetKernelArg(chacha_ctr_encrypt_kernel, 9, sizeof(cl_uint), (void *)&block_i ) );
 
         size_t globalSize[2] = {num_blocks, 0};
         size_t localSize[2] = {num_threads_per_block, 0};	
-        ret = clEnqueueNDRangeKernel(cmd_queue, cl_chacha_ctr_encrypt_kernel, 1, NULL,
+        ret = clEnqueueNDRangeKernel(cmd_queue, chacha_ctr_encrypt_kernel, 1, NULL,
             globalSize, localSize, 0, NULL, NULL);
             CL_ERR( ret );
 

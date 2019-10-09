@@ -53,11 +53,13 @@ extern bool cl_is_init;
 extern cl_context context;
 extern cl_command_queue cmd_queue;
 extern cl_program program;
-extern cl_kernel cl_chacha20_cbc128_encrypt_kernel;
-extern cl_kernel cl_chacha20_cbc128_encrypt_sample_kernel;
-extern cl_kernel cl_chacha_ctr_encrypt_kernel;
-extern cl_kernel cl_aes_cbc_enc;
-extern cl_kernel cl_aes_cbc_dec;
+
+extern cl_kernel aes_cbc_enc_kernel;
+
+extern cl_kernel chacha20_cbc128_encrypt_kernel;
+extern cl_kernel chacha20_cbc128_encrypt_sample_kernel;
+extern cl_kernel chacha_ctr_encrypt_kernel;
+
 extern cl_kernel init_sha256_state_kernel;
 extern cl_kernel end_sha256_state_kernel;
 extern cl_kernel ed25519_verify_kernel;

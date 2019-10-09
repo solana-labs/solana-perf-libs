@@ -123,7 +123,8 @@ int poh_verify_many(uint8_t* hashes,
 	CL_ERR( clEnqueueWriteBuffer(cmd_queue, cur_ctx->hashes, CL_TRUE, 0, hashes_size, hashes, 0, NULL, NULL));
 	CL_ERR( clEnqueueWriteBuffer(cmd_queue, cur_ctx->num_hashes_arr, CL_TRUE, 0, num_hashes_size, num_hashes_arr, 0, NULL, NULL));
 	
-    int num_blocks = ROUND_UP_DIV(num_elems, NUM_THREADS_PER_BLOCK);
+    size_t num_blocks = ROUND_UP_DIV(num_elems, NUM_THREADS_PER_BLOCK);
+	size_t num_threads_block = NUM_THREADS_PER_BLOCK;
 
     //poh_verify_kernel<<<num_blocks, NUM_THREADS_PER_BLOCK, 0, stream>>>(cur_ctx->hashes, cur_ctx->num_hashes_arr, num_elems);
     //CUDA_CHK(cudaPeekAtLastError());
@@ -133,7 +134,7 @@ int poh_verify_many(uint8_t* hashes,
 	CL_ERR( clSetKernelArg(poh_verify_kernel, 2, sizeof(size_t), (void *)&num_elems) );
 
 	size_t globalSize[2] = {num_blocks, 0};
-	size_t localSize[2] = {NUM_THREADS_PER_BLOCK, 0};	
+	size_t localSize[2] = {num_threads_block, 0};	
 	ret = clEnqueueNDRangeKernel(cmd_queue, poh_verify_kernel, 1, NULL,
 		globalSize, localSize, 0, NULL, NULL);
 		CL_ERR( ret );

@@ -44,7 +44,7 @@ void AES_cbc_encrypt_many(const unsigned char *in, unsigned char *out,
 
     cl_mem sha_state_device;
 
-    uint32_t sample_len = 0;
+    cl_uint sample_len = 0;
     cl_mem samples_device;
 
     in_device = clCreateBuffer(context, CL_MEM_READ_WRITE, BLOCK_SIZE, NULL, &ret);
@@ -79,22 +79,22 @@ void AES_cbc_encrypt_many(const unsigned char *in, unsigned char *out,
         CL_ERR( clEnqueueWriteBuffer(cmd_queue, in_device, CL_TRUE, 0, size, in, 0, NULL, NULL));
 
         /* set OpenCL kernel argument */
-        cl_int block_i = i * BLOCK_SIZE;
+        cl_uint block_i = i * BLOCK_SIZE;
 
-        CL_ERR( clSetKernelArg(cl_aes_cbc_enc, 0, sizeof(cl_mem), (void *)&in_device) );
-        CL_ERR( clSetKernelArg(cl_aes_cbc_enc, 1, sizeof(cl_mem), (void *)&output_device) );
-        CL_ERR( clSetKernelArg(cl_aes_cbc_enc, 2, sizeof(size_t), (void *)&size) );
-        CL_ERR( clSetKernelArg(cl_aes_cbc_enc, 3, sizeof(cl_mem), (void *)&keys_device) );
-        CL_ERR( clSetKernelArg(cl_aes_cbc_enc, 4, sizeof(cl_mem), (void *)&ivec_device) );
-        CL_ERR( clSetKernelArg(cl_aes_cbc_enc, 5, sizeof(size_t), (void *)&num_keys) );
-        CL_ERR( clSetKernelArg(cl_aes_cbc_enc, 6, sizeof(cl_mem), (void *)&sha_state_device) );
-        CL_ERR( clSetKernelArg(cl_aes_cbc_enc, 7, sizeof(cl_mem), (void *)&samples_device) );
-        CL_ERR( clSetKernelArg(cl_aes_cbc_enc, 8, sizeof(size_t), (void *)&sample_len) );
-        CL_ERR( clSetKernelArg(cl_aes_cbc_enc, 9, sizeof(size_t), (void *)&block_i ) );
+        CL_ERR( clSetKernelArg(aes_cbc_enc_kernel, 0, sizeof(cl_mem), (void *)&in_device) );
+        CL_ERR( clSetKernelArg(aes_cbc_enc_kernel, 1, sizeof(cl_mem), (void *)&output_device) );
+        CL_ERR( clSetKernelArg(aes_cbc_enc_kernel, 2, sizeof(cl_uint), (void *)&size) );
+        CL_ERR( clSetKernelArg(aes_cbc_enc_kernel, 3, sizeof(cl_mem), (void *)&keys_device) );
+        CL_ERR( clSetKernelArg(aes_cbc_enc_kernel, 4, sizeof(cl_mem), (void *)&ivec_device) );
+        CL_ERR( clSetKernelArg(aes_cbc_enc_kernel, 5, sizeof(cl_uint), (void *)&num_keys) );
+        CL_ERR( clSetKernelArg(aes_cbc_enc_kernel, 6, sizeof(cl_mem), (void *)&sha_state_device) );
+        CL_ERR( clSetKernelArg(aes_cbc_enc_kernel, 7, sizeof(cl_mem), (void *)&samples_device) );
+        CL_ERR( clSetKernelArg(aes_cbc_enc_kernel, 8, sizeof(cl_uint), (void *)&sample_len) );
+        CL_ERR( clSetKernelArg(aes_cbc_enc_kernel, 9, sizeof(cl_uint), (void *)&block_i ) );
 
         size_t globalSize[2] = {num_blocks, 0};
         size_t localSize[2] = {num_threads_per_block, 0};	
-        ret = clEnqueueNDRangeKernel(cmd_queue, cl_aes_cbc_enc, 1, NULL,
+        ret = clEnqueueNDRangeKernel(cmd_queue, aes_cbc_enc_kernel, 1, NULL,
             globalSize, localSize, 0, NULL, NULL);
             CL_ERR( ret );
 

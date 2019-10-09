@@ -8,30 +8,54 @@
 
 #include "gpu_common.h"
 
-//const char *kernels_aes_cbc_src = R""""(
-//)"""";
-//const char *kernels_chacha_cbc_src = R""""(
-//)"""";
-const char *kernels_verify_src = R""""(
-)"""";
-
-// OpenCL kernel source code
-#include "kernels_aes_cbc.h"
-#include "kernels_chacha_cbc.h"
-
-// TODO internal compiler error problem
-//#include "kernels_verify.h"
-
 bool cl_is_init = false;
 
 cl_context context;
 cl_command_queue cmd_queue;
 cl_program program;
-cl_kernel cl_chacha20_cbc128_encrypt_kernel;
-cl_kernel cl_chacha20_cbc128_encrypt_sample_kernel;
-cl_kernel cl_chacha_ctr_encrypt_kernel;
-cl_kernel cl_aes_cbc_enc;
-cl_kernel cl_aes_cbc_dec;
+
+//////////////////////////////////////
+
+#define KERNELS_AES_CBC	1
+
+#ifdef	KERNELS_AES_CBC
+	#include "kernels_aes_cbc.h"
+#else
+	const char *kernels_aes_cbc_src = R""""(
+	)"""";
+#endif
+
+cl_kernel aes_cbc_enc_kernel;
+
+//////////////////////////////////////
+
+#define KERNELS_CHACHA_CBC	1
+
+#if	KERNELS_CHACHA_CBC
+	#include "kernels_chacha_cbc.h"
+#else
+	const char *kernels_chacha_cbc_src = R""""(
+	)"""";
+#endif
+
+cl_kernel chacha20_cbc128_encrypt_kernel;
+cl_kernel chacha20_cbc128_encrypt_sample_kernel;
+cl_kernel chacha_ctr_encrypt_kernel;
+
+//////////////////////////////////////
+
+//#define KERNELS_PRECOMP_DATA	1
+
+#ifdef	KERNELS_PRECOMP_DATA
+	#include "kernels_precomp_data.h"
+	#include "kernels_verify.h"
+#else
+	const char *kernels_precomp_data_src = R""""(
+	)"""";
+	const char *kernels_verify_src = R""""(
+	)"""";
+#endif
+
 cl_kernel init_sha256_state_kernel;
 cl_kernel end_sha256_state_kernel;
 cl_kernel ed25519_verify_kernel;
@@ -269,10 +293,15 @@ bool cl_check_init(void) {
     cmd_queue = clCreateCommandQueue(context, device, 0, &ret);
     CL_ERR( ret );
 
+	/************************************************
+	* OpenCL kernels aes_cbc_enc/dec
+	*************************************************/
+	
+#ifdef KERNELS_AES_CBC
+	cout << "Compiling aes-cbc kernels" << endl;
+
     /* retrieve kernel source */
-    kernel_src += kernels_aes_cbc_src;
-	kernel_src += kernels_chacha_cbc_src;
-	kernel_src += kernels_verify_src;
+    kernel_src = kernels_aes_cbc_src;
 	
 	const char* kernel_src_cstr = kernel_src.c_str();
 
@@ -286,22 +315,64 @@ bool cl_check_init(void) {
     CL_COMPILE_ERR( ret, program, device );
 
     /* create kernel associated to compiled source kernel */
-    cl_chacha20_cbc128_encrypt_kernel = clCreateKernel(program, "cl_chacha20_cbc128_encrypt_kernel", &ret);
+	aes_cbc_enc_kernel = clCreateKernel(program, "CRYPTO_cbc128_encrypt_kernel", &ret);
+    CL_ERR( ret );
+#endif
+	
+	/************************************************
+	* OpenCL kernels chacha20_cbc128
+	*************************************************/
+	
+#ifdef KERNELS_CHACHA_CBC
+	cout << "Compiling chacha_cbc kernels" << endl;
+
+	/* retrieve kernel source */
+	kernel_src = kernels_chacha_cbc_src;
+	
+	kernel_src_cstr = kernel_src.c_str();
+
+    /* create kernel program from source */
+    program = clCreateProgramWithSource(context, 1,
+        &kernel_src_cstr, NULL, &ret);
     CL_ERR( ret );
 
-    cl_chacha20_cbc128_encrypt_sample_kernel = clCreateKernel(program, "cl_chacha20_cbc128_encrypt_sample_kernel", &ret);
+    /* compile the program for the given set of devices */
+    ret = clBuildProgram(program, 1, &device, "", NULL, NULL);
+    CL_COMPILE_ERR( ret, program, device );
+	
+	chacha20_cbc128_encrypt_kernel = clCreateKernel(program, "chacha20_cbc128_encrypt_kernel", &ret);
     CL_ERR( ret );
 
-    cl_chacha_ctr_encrypt_kernel = clCreateKernel(program, "cl_chacha_ctr_encrypt_kernel", &ret);
+    chacha20_cbc128_encrypt_sample_kernel = clCreateKernel(program, "chacha20_cbc128_encrypt_sample_kernel", &ret);
     CL_ERR( ret );
 
-    cl_aes_cbc_enc = clCreateKernel(program, "cl_aes_cbc_enc", &ret);
+    chacha_ctr_encrypt_kernel = clCreateKernel(program, "chacha_ctr_encrypt_kernel", &ret);
+    CL_ERR( ret );
+#endif
+	
+	/************************************************
+	* OpenCL kernels verify
+	*************************************************/
+	
+#ifdef KERNELS_PRECOMP_DATA
+	cout << "Compiling verify kernels" << endl;
+	
+	/* retrieve kernel source */
+	kernel_src = kernels_precomp_data_src;
+	kernel_src += kernels_verify_src;
+	
+	kernel_src_cstr = kernel_src.c_str();
+
+    /* create kernel program from source */
+    program = clCreateProgramWithSource(context, 1,
+        &kernel_src_cstr, NULL, &ret);
     CL_ERR( ret );
 
-    cl_aes_cbc_dec = clCreateKernel(program, "cl_aes_cbc_dec", &ret);
-    CL_ERR( ret );
-    
-    init_sha256_state_kernel = clCreateKernel(program, "init_sha256_state_kernel", &ret);
+    /* compile the program for the given set of devices */
+    ret = clBuildProgram(program, 1, &device, "", NULL, NULL);
+    CL_COMPILE_ERR( ret, program, device );
+	
+	init_sha256_state_kernel = clCreateKernel(program, "init_sha256_state_kernel", &ret);
     CL_ERR( ret );
 
     end_sha256_state_kernel = clCreateKernel(program, "end_sha256_state_kernel", &ret);
@@ -312,6 +383,7 @@ bool cl_check_init(void) {
 	
 	poh_verify_kernel = clCreateKernel(program, "poh_verify_kernel", &ret);
     CL_ERR( ret );
+#endif
 
     // set init to done
     cl_is_init = true;
