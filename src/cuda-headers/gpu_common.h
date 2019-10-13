@@ -54,8 +54,10 @@ extern cl_context context;
 extern cl_command_queue cmd_queue;
 extern cl_program program;
 
-extern cl_kernel aes_cbc_enc_kernel;
+extern cl_kernel CRYPTO_cbc128_encrypt_kernel;
+extern cl_kernel AES_cbc_encrypt_kernel;
 
+extern cl_kernel chacha20_ctr_encrypt_kernel;
 extern cl_kernel chacha20_cbc128_encrypt_kernel;
 extern cl_kernel chacha20_cbc128_encrypt_sample_kernel;
 extern cl_kernel chacha_ctr_encrypt_kernel;
@@ -70,8 +72,13 @@ extern cl_kernel poh_verify_kernel;
 #define __device__
 #define __global__
 
+#include <iostream>
+
+using namespace std;
+
 // OpenCL utilities
-int CL_ERR(int cl_ret);
+#define CL_ERR(cl_ret) if(cl_ret != CL_SUCCESS){ cout << endl << cl_get_string_err(cl_ret) << " file " << __FILE__ << "@" << __LINE__ << endl; }
+
 int CL_COMPILE_ERR(int cl_ret,
                   cl_program program,
                   cl_device_id device);

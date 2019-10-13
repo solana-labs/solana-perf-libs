@@ -94,8 +94,6 @@ int poh_verify_many(uint8_t* hashes,
     gpu_ctx* cur_ctx = &g_gpu_ctx[cur_gpu][cur_queue];
     pthread_mutex_lock(&cur_ctx->mutex);
 
-    //CUDA_CHK(cudaSetDevice(cur_gpu));
-
     LOG("cur gpu: %d cur queue: %d\n", cur_gpu, cur_queue);
 
     size_t hashes_size = num_elems * SHA256_BLOCK_SIZE * sizeof(uint8_t);
@@ -133,7 +131,7 @@ int poh_verify_many(uint8_t* hashes,
 	CL_ERR( clSetKernelArg(poh_verify_kernel, 1, sizeof(cl_mem), (void *)&cur_ctx->num_hashes_arr) );
 	CL_ERR( clSetKernelArg(poh_verify_kernel, 2, sizeof(size_t), (void *)&num_elems) );
 
-	size_t globalSize[2] = {num_blocks, 0};
+	size_t globalSize[2] = {num_blocks * num_threads_block, 0};
 	size_t localSize[2] = {num_threads_block, 0};	
 	ret = clEnqueueNDRangeKernel(cmd_queue, poh_verify_kernel, 1, NULL,
 		globalSize, localSize, 0, NULL, NULL);

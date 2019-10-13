@@ -12,6 +12,10 @@
 V=debug
 include gpu-common.mk
 
+# OpenCL include/library
+CL_HEADER_DIR:=/cygdrive/c/Program\ Files/NVIDIA\ GPU\ Computing\ Toolkit/CUDA/v10.0/include/
+CL_LIBRARY_DIR:=/cygdrive/c/Program\ Files/NVIDIA\ GPU\ Computing\ Toolkit/CUDA/v10.0/lib/x64
+
 CHACHA_TEST_BIN=cuda_chacha_test
 ECC_TEST_BIN=cuda_ed25519_verify
 LIB=cuda-crypt
@@ -24,7 +28,7 @@ CUDA_HEADER_DIR:=cuda-headers
 CUDA_SHA256_DIR:=cuda-sha256
 
 CFLAGS+=-DENDIAN_NEUTRAL -DLTC_NO_ASM -I$(CUDA_HEADER_DIR) -I$(CUDA_SHA256_DIR)
-CL_CFLAGS=-std=c++11 -DENDIAN_NEUTRAL -DLTC_NO_ASM -I$(CUDA_HEADER_DIR) -I$(CUDA_SHA256_DIR)
+CL_CFLAGS=-std=c++11 -DENDIAN_NEUTRAL -DUSE_RDTSC -I$(CUDA_HEADER_DIR) -I$(CUDA_SHA256_DIR) -I$(CL_HEADER_DIR) -L$(CL_LIBRARY_DIR)
 
 all: $V/$(CHACHA_TEST_BIN) $V/$(ECC_TEST_BIN) $(V)/lib$(LIB).so
 
@@ -106,7 +110,7 @@ $V/cl_ecc_main.o: $(addprefix $(CL_ECC_DIR)/,main.cpp ed25519.h)
 	g++ $(CL_CFLAGS) -c $< -o $@
 	
 $V/$(CL_ECC_TEST_BIN): $V/cl_ecc_main.o $V/lib$(CL_LIB).a
-	g++ $(CL_CFLAGS) -Wl,-v -L/usr/local/cuda-9.1/lib64 -L$V -lpthread -lOpenCL $^ -o $@
+	g++ $(CL_CFLAGS) -Wl,-v -L/usr/local/cuda-9.1/lib64 -L$V -lpthread $^ -lOpenCL -o $@
 
 $V/crypt-dlink.o: $V/chacha_cbc.o $V/aes_cbc.o $V/verify.o $V/poh_verify.o
 	$(NVCC) -Xcompiler "-fPIC" --gpu-architecture=compute_61 --device-link $^ --output-file $@
@@ -119,6 +123,9 @@ $V/lib$(LIB).so: $V/crypt-dlink.o $V/chacha_cbc.o $V/aes_cbc.o $V/verify.o $V/po
 
 $V/$(CHACHA_TEST_BIN): $(CHACHA_DIR)/test.cu $V/lib$(LIB).a
 	$(NVCC) $(CFLAGS) -L$V -l$(LIB) $< -o $@
+
+$V/$(CL_CHACHA_TEST_BIN): $(CL_CHACHA_DIR)/test.cpp $V/lib$(CL_LIB).a
+	g++ $(CL_CFLAGS) -Wl,-v -L/usr/local/cuda-9.1/lib64 -L$V -lpthread $^ -lOpenCL -o $@
 
 $V/ecc_main.o: $(addprefix $(ECC_DIR)/,main.cu ed25519.h)
 	@mkdir -p $(@D)

@@ -4,6 +4,7 @@
 #include <inttypes.h>
 #include "perftime.h"
 #include <algorithm>
+#include <string.h>
 
 void print_bytes(const char* name, const uint8_t* input, size_t len)
 {
@@ -70,7 +71,7 @@ int test_chacha_cbc_sample(ctx_t* gctx)
         key[i] = i;
     }
 
-    cuda_chacha20_cbc_encrypt(gctx->input, gctx->output_ref, gctx->len, key, gctx->chacha_ivec);
+    chacha20_cbc_encrypt(gctx->input, gctx->output_ref, gctx->len, key, gctx->chacha_ivec);
     memcpy(gctx->chacha_ivec_ref, gctx->chacha_ivec, sizeof(gctx->chacha_ivec));
 
     printf("\n\n");
@@ -80,7 +81,7 @@ int test_chacha_cbc_sample(ctx_t* gctx)
     perftime_t start, end;
     get_time(&start);
     for (int i = 0; i < iterations; i++) {
-        cuda_chacha20_cbc_encrypt(gctx->input, gctx->output, gctx->len, key, gctx->chacha_ivec);
+        chacha20_cbc_encrypt(gctx->input, gctx->output, gctx->len, key, gctx->chacha_ivec);
     }
     get_time(&end);
 
@@ -145,7 +146,7 @@ int test_chacha_cbc(ctx_t* gctx)
         key[i] = i;
     }
 
-    cuda_chacha20_cbc_encrypt(gctx->input, gctx->output_ref, gctx->len, key, gctx->chacha_ivec);
+    chacha20_cbc_encrypt(gctx->input, gctx->output_ref, gctx->len, key, gctx->chacha_ivec);
     memcpy(gctx->chacha_ivec_ref, gctx->chacha_ivec, sizeof(gctx->chacha_ivec));
 
     printf("\n\n");
@@ -155,7 +156,7 @@ int test_chacha_cbc(ctx_t* gctx)
     perftime_t start, end;
     get_time(&start);
     for (int i = 0; i < iterations; i++) {
-        cuda_chacha20_cbc_encrypt(gctx->input, gctx->output, gctx->len, key, gctx->chacha_ivec);
+        chacha20_cbc_encrypt(gctx->input, gctx->output, gctx->len, key, gctx->chacha_ivec);
     }
     get_time(&end);
 

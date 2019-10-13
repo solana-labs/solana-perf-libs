@@ -17,7 +17,7 @@ void chacha20_ctr_encrypt(const uint8_t *in, uint8_t *out, size_t in_len,
                                               const uint8_t key[CHACHA_KEY_SIZE], const uint8_t nonce[CHACHA_NONCE_SIZE],
                                               uint32_t counter);
 
-void cuda_chacha20_cbc_encrypt(const uint8_t *in, uint8_t *out, size_t in_len,
+void chacha20_cbc_encrypt(const uint8_t *in, uint8_t *out, size_t in_len,
                                const uint8_t key[CHACHA_KEY_SIZE], uint8_t* ivec);
 
 void chacha_ctr_encrypt_many(const unsigned char* in, unsigned char* out,

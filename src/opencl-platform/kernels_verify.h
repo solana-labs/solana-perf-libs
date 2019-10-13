@@ -1,5 +1,836 @@
 const char *kernels_verify_src = R""""(
 
+////////////////////////////////////////////////////////////////////////////////////
+
+/* LibTomCrypt, modular cryptographic library -- Tom St Denis
+ *
+ * LibTomCrypt is a library that provides various cryptographic
+ * algorithms in a highly modular and flexible manner.
+ *
+ * The library is free for all purposes without any express
+ * guarantee it works.
+ */
+ 
+ 
+#define ENDIAN_NEUTRAL 1
+
+typedef uint64_t ulong64;
+typedef uint32_t ulong32;
+
+enum {
+    CRYPT_OK=0,
+    CRYPT_INVALID_ARG,
+    CRYPT_HASH_OVERFLOW,
+};
+
+/* ---- HELPER MACROS ---- */
+#ifdef ENDIAN_NEUTRAL
+
+#define STORE32L(x, y)                                                                     \
+  do { (y)[3] = (unsigned char)(((x)>>24)&255); (y)[2] = (unsigned char)(((x)>>16)&255);   \
+       (y)[1] = (unsigned char)(((x)>>8)&255); (y)[0] = (unsigned char)((x)&255); } while(0)
+
+#define LOAD32L(x, y)                            \
+  do { x = ((ulong32)((y)[3] & 255)<<24) | \
+           ((ulong32)((y)[2] & 255)<<16) | \
+           ((ulong32)((y)[1] & 255)<<8)  | \
+           ((ulong32)((y)[0] & 255)); } while(0)
+
+#define STORE64L(x, y)                                                                     \
+  do { (y)[7] = (unsigned char)(((x)>>56)&255); (y)[6] = (unsigned char)(((x)>>48)&255);   \
+       (y)[5] = (unsigned char)(((x)>>40)&255); (y)[4] = (unsigned char)(((x)>>32)&255);   \
+       (y)[3] = (unsigned char)(((x)>>24)&255); (y)[2] = (unsigned char)(((x)>>16)&255);   \
+       (y)[1] = (unsigned char)(((x)>>8)&255); (y)[0] = (unsigned char)((x)&255); } while(0)
+
+#define LOAD64L(x, y)                                                       \
+  do { x = (((ulong64)((y)[7] & 255))<<56)|(((ulong64)((y)[6] & 255))<<48)| \
+           (((ulong64)((y)[5] & 255))<<40)|(((ulong64)((y)[4] & 255))<<32)| \
+           (((ulong64)((y)[3] & 255))<<24)|(((ulong64)((y)[2] & 255))<<16)| \
+           (((ulong64)((y)[1] & 255))<<8)|(((ulong64)((y)[0] & 255))); } while(0)
+
+#define STORE32H(x, y)                                                                     \
+  do { (y)[0] = (unsigned char)(((x)>>24)&255); (y)[1] = (unsigned char)(((x)>>16)&255);   \
+       (y)[2] = (unsigned char)(((x)>>8)&255); (y)[3] = (unsigned char)((x)&255); } while(0)
+
+#define LOAD32H(x, y)                            \
+  do { x = ((ulong32)((y)[0] & 255)<<24) | \
+           ((ulong32)((y)[1] & 255)<<16) | \
+           ((ulong32)((y)[2] & 255)<<8)  | \
+           ((ulong32)((y)[3] & 255)); } while(0)
+
+#define STORE64H(x, y)                                                                     \
+do { (y)[0] = (unsigned char)(((x)>>56)&255); (y)[1] = (unsigned char)(((x)>>48)&255);     \
+     (y)[2] = (unsigned char)(((x)>>40)&255); (y)[3] = (unsigned char)(((x)>>32)&255);     \
+     (y)[4] = (unsigned char)(((x)>>24)&255); (y)[5] = (unsigned char)(((x)>>16)&255);     \
+     (y)[6] = (unsigned char)(((x)>>8)&255); (y)[7] = (unsigned char)((x)&255); } while(0)
+
+#define LOAD64H(x, y)                                                      \
+do { x = (((ulong64)((y)[0] & 255))<<56)|(((ulong64)((y)[1] & 255))<<48) | \
+         (((ulong64)((y)[2] & 255))<<40)|(((ulong64)((y)[3] & 255))<<32) | \
+         (((ulong64)((y)[4] & 255))<<24)|(((ulong64)((y)[5] & 255))<<16) | \
+         (((ulong64)((y)[6] & 255))<<8)|(((ulong64)((y)[7] & 255))); } while(0)
+
+
+#elif defined(ENDIAN_LITTLE)
+
+#ifdef LTC_HAVE_BSWAP_BUILTIN
+
+#define STORE32H(x, y)                          \
+do { ulong32 __t = __builtin_bswap32 ((x));     \
+      XMEMCPY ((y), &__t, 4); } while(0)
+
+#define LOAD32H(x, y)                           \
+do { XMEMCPY (&(x), (y), 4);                    \
+      (x) = __builtin_bswap32 ((x)); } while(0)
+
+#elif !defined(LTC_NO_BSWAP) && (defined(INTEL_CC) || (defined(__GNUC__) && (defined(__DJGPP__) || defined(__CYGWIN__) || defined(__MINGW32__) || defined(__i386__) || defined(__x86_64__))))
+
+#define STORE32H(x, y)           \
+asm __volatile__ (               \
+   "bswapl %0     \n\t"          \
+   "movl   %0,(%1)\n\t"          \
+   "bswapl %0     \n\t"          \
+      ::"r"(x), "r"(y));
+
+#define LOAD32H(x, y)          \
+asm __volatile__ (             \
+   "movl (%1),%0\n\t"          \
+   "bswapl %0\n\t"             \
+   :"=r"(x): "r"(y));
+
+#else
+
+#define STORE32H(x, y)                                                                     \
+  do { (y)[0] = (unsigned char)(((x)>>24)&255); (y)[1] = (unsigned char)(((x)>>16)&255);   \
+       (y)[2] = (unsigned char)(((x)>>8)&255); (y)[3] = (unsigned char)((x)&255); } while(0)
+
+#define LOAD32H(x, y)                            \
+  do { x = ((ulong32)((y)[0] & 255)<<24) | \
+           ((ulong32)((y)[1] & 255)<<16) | \
+           ((ulong32)((y)[2] & 255)<<8)  | \
+           ((ulong32)((y)[3] & 255)); } while(0)
+
+#endif
+
+#ifdef LTC_HAVE_BSWAP_BUILTIN
+
+#define STORE64H(x, y)                          \
+do { ulong64 __t = __builtin_bswap64 ((x));     \
+      XMEMCPY ((y), &__t, 8); } while(0)
+
+#define LOAD64H(x, y)                           \
+do { XMEMCPY (&(x), (y), 8);                    \
+      (x) = __builtin_bswap64 ((x)); } while(0)
+
+/* x86_64 processor */
+#elif !defined(LTC_NO_BSWAP) && (defined(__GNUC__) && defined(__x86_64__))
+
+#define STORE64H(x, y)           \
+asm __volatile__ (               \
+   "bswapq %0     \n\t"          \
+   "movq   %0,(%1)\n\t"          \
+   "bswapq %0     \n\t"          \
+   ::"r"(x), "r"(y): "memory");
+
+#define LOAD64H(x, y)          \
+asm __volatile__ (             \
+   "movq (%1),%0\n\t"          \
+   "bswapq %0\n\t"             \
+   :"=r"(x): "r"(y): "memory");
+
+#else
+
+#define STORE64H(x, y)                                                                     \
+do { (y)[0] = (unsigned char)(((x)>>56)&255); (y)[1] = (unsigned char)(((x)>>48)&255);     \
+     (y)[2] = (unsigned char)(((x)>>40)&255); (y)[3] = (unsigned char)(((x)>>32)&255);     \
+     (y)[4] = (unsigned char)(((x)>>24)&255); (y)[5] = (unsigned char)(((x)>>16)&255);     \
+     (y)[6] = (unsigned char)(((x)>>8)&255); (y)[7] = (unsigned char)((x)&255); } while(0)
+
+#define LOAD64H(x, y)                                                      \
+do { x = (((ulong64)((y)[0] & 255))<<56)|(((ulong64)((y)[1] & 255))<<48) | \
+         (((ulong64)((y)[2] & 255))<<40)|(((ulong64)((y)[3] & 255))<<32) | \
+         (((ulong64)((y)[4] & 255))<<24)|(((ulong64)((y)[5] & 255))<<16) | \
+         (((ulong64)((y)[6] & 255))<<8)|(((ulong64)((y)[7] & 255))); } while(0)
+
+#endif
+
+#ifdef ENDIAN_32BITWORD
+
+#define STORE32L(x, y)        \
+  do { ulong32  __t = (x); XMEMCPY(y, &__t, 4); } while(0)
+
+#define LOAD32L(x, y)         \
+  do { XMEMCPY(&(x), y, 4); } while(0)
+
+#define STORE64L(x, y)                                                                     \
+  do { (y)[7] = (unsigned char)(((x)>>56)&255); (y)[6] = (unsigned char)(((x)>>48)&255);   \
+       (y)[5] = (unsigned char)(((x)>>40)&255); (y)[4] = (unsigned char)(((x)>>32)&255);   \
+       (y)[3] = (unsigned char)(((x)>>24)&255); (y)[2] = (unsigned char)(((x)>>16)&255);   \
+       (y)[1] = (unsigned char)(((x)>>8)&255); (y)[0] = (unsigned char)((x)&255); } while(0)
+
+#define LOAD64L(x, y)                                                       \
+  do { x = (((ulong64)((y)[7] & 255))<<56)|(((ulong64)((y)[6] & 255))<<48)| \
+           (((ulong64)((y)[5] & 255))<<40)|(((ulong64)((y)[4] & 255))<<32)| \
+           (((ulong64)((y)[3] & 255))<<24)|(((ulong64)((y)[2] & 255))<<16)| \
+           (((ulong64)((y)[1] & 255))<<8)|(((ulong64)((y)[0] & 255))); } while(0)
+
+#else /* 64-bit words then  */
+
+#define STORE32L(x, y)        \
+  do { ulong32 __t = (x); XMEMCPY(y, &__t, 4); } while(0)
+
+#define LOAD32L(x, y)         \
+  do { XMEMCPY(&(x), y, 4); x &= 0xFFFFFFFF; } while(0)
+
+#define STORE64L(x, y)        \
+  do { ulong64 __t = (x); XMEMCPY(y, &__t, 8); } while(0)
+
+#define LOAD64L(x, y)         \
+  do { XMEMCPY(&(x), y, 8); } while(0)
+
+#endif /* ENDIAN_64BITWORD */
+
+#elif defined(ENDIAN_BIG)
+
+#define STORE32L(x, y)                                                                     \
+  do { (y)[3] = (unsigned char)(((x)>>24)&255); (y)[2] = (unsigned char)(((x)>>16)&255);   \
+       (y)[1] = (unsigned char)(((x)>>8)&255); (y)[0] = (unsigned char)((x)&255); } while(0)
+
+#define LOAD32L(x, y)                            \
+  do { x = ((ulong32)((y)[3] & 255)<<24) | \
+           ((ulong32)((y)[2] & 255)<<16) | \
+           ((ulong32)((y)[1] & 255)<<8)  | \
+           ((ulong32)((y)[0] & 255)); } while(0)
+
+#define STORE64L(x, y)                                                                     \
+do { (y)[7] = (unsigned char)(((x)>>56)&255); (y)[6] = (unsigned char)(((x)>>48)&255);     \
+     (y)[5] = (unsigned char)(((x)>>40)&255); (y)[4] = (unsigned char)(((x)>>32)&255);     \
+     (y)[3] = (unsigned char)(((x)>>24)&255); (y)[2] = (unsigned char)(((x)>>16)&255);     \
+     (y)[1] = (unsigned char)(((x)>>8)&255); (y)[0] = (unsigned char)((x)&255); } while(0)
+
+#define LOAD64L(x, y)                                                      \
+do { x = (((ulong64)((y)[7] & 255))<<56)|(((ulong64)((y)[6] & 255))<<48) | \
+         (((ulong64)((y)[5] & 255))<<40)|(((ulong64)((y)[4] & 255))<<32) | \
+         (((ulong64)((y)[3] & 255))<<24)|(((ulong64)((y)[2] & 255))<<16) | \
+         (((ulong64)((y)[1] & 255))<<8)|(((ulong64)((y)[0] & 255))); } while(0)
+
+#ifdef ENDIAN_32BITWORD
+
+#define STORE32H(x, y)        \
+  do { ulong32 __t = (x); XMEMCPY(y, &__t, 4); } while(0)
+
+#define LOAD32H(x, y)         \
+  do { XMEMCPY(&(x), y, 4); } while(0)
+
+#define STORE64H(x, y)                                                                     \
+  do { (y)[0] = (unsigned char)(((x)>>56)&255); (y)[1] = (unsigned char)(((x)>>48)&255);   \
+       (y)[2] = (unsigned char)(((x)>>40)&255); (y)[3] = (unsigned char)(((x)>>32)&255);   \
+       (y)[4] = (unsigned char)(((x)>>24)&255); (y)[5] = (unsigned char)(((x)>>16)&255);   \
+       (y)[6] = (unsigned char)(((x)>>8)&255);  (y)[7] = (unsigned char)((x)&255); } while(0)
+
+#define LOAD64H(x, y)                                                       \
+  do { x = (((ulong64)((y)[0] & 255))<<56)|(((ulong64)((y)[1] & 255))<<48)| \
+           (((ulong64)((y)[2] & 255))<<40)|(((ulong64)((y)[3] & 255))<<32)| \
+           (((ulong64)((y)[4] & 255))<<24)|(((ulong64)((y)[5] & 255))<<16)| \
+           (((ulong64)((y)[6] & 255))<<8)| (((ulong64)((y)[7] & 255))); } while(0)
+
+#else /* 64-bit words then  */
+
+#define STORE32H(x, y)        \
+  do { ulong32 __t = (x); XMEMCPY(y, &__t, 4); } while(0)
+
+#define LOAD32H(x, y)         \
+  do { XMEMCPY(&(x), y, 4); x &= 0xFFFFFFFF; } while(0)
+
+#define STORE64H(x, y)        \
+  do { ulong64 __t = (x); XMEMCPY(y, &__t, 8); } while(0)
+
+#define LOAD64H(x, y)         \
+  do { XMEMCPY(&(x), y, 8); } while(0)
+
+#endif /* ENDIAN_64BITWORD */
+#endif /* ENDIAN_BIG */
+
+#define BSWAP(x)  ( ((x>>24)&0x000000FFUL) | ((x<<24)&0xFF000000UL)  | \
+                    ((x>>8)&0x0000FF00UL)  | ((x<<8)&0x00FF0000UL) )
+
+
+/* 32-bit Rotates */
+#if defined(_MSC_VER)
+#define LTC_ROx_ASM
+
+/* instrinsic rotate */
+#include <stdlib.h>
+#pragma intrinsic(_lrotr,_lrotl)
+#define ROR(x,n) _lrotr(x,n)
+#define ROL(x,n) _lrotl(x,n)
+#define RORc(x,n) _lrotr(x,n)
+#define ROLc(x,n) _lrotl(x,n)
+
+#elif defined(__CUDA__ARCH__)
+
+# define ROL(x,n) __byte_perm(x, 0, 0x0321)
+# define ROR(x,n) __byte_perm(x, 0, 0x2103)
+# define ROLc(x,n) ROL(x,n)
+# define RORc(x,n) ROR(x,n)
+
+#elif !defined(__STRICT_ANSI__) && defined(__GNUC__) && (defined(__i386__) || defined(__x86_64__)) && !defined(INTEL_CC) && !defined(LTC_NO_ASM)
+#define LTC_ROx_ASM
+
+static inline ulong32 ROL(ulong32 word, int i)
+{
+   asm ("roll %%cl,%0"
+      :"=r" (word)
+      :"0" (word),"c" (i));
+   return word;
+}
+
+static inline ulong32 ROR(ulong32 word, int i)
+{
+   asm ("rorl %%cl,%0"
+      :"=r" (word)
+      :"0" (word),"c" (i));
+   return word;
+}
+
+#ifndef LTC_NO_ROLC
+
+#define ROLc(word,i) ({ \
+   ulong32 __ROLc_tmp = (word); \
+   __asm__ ("roll %2, %0" : \
+            "=r" (__ROLc_tmp) : \
+            "0" (__ROLc_tmp), \
+            "I" (i)); \
+            __ROLc_tmp; \
+   })
+#define RORc(word,i) ({ \
+   ulong32 __RORc_tmp = (word); \
+   __asm__ ("rorl %2, %0" : \
+            "=r" (__RORc_tmp) : \
+            "0" (__RORc_tmp), \
+            "I" (i)); \
+            __RORc_tmp; \
+   })
+
+#else
+
+#define ROLc ROL
+#define RORc ROR
+
+#endif
+
+#elif !defined(__STRICT_ANSI__) && defined(LTC_PPC32)
+#define LTC_ROx_ASM
+
+static inline ulong32 ROL(ulong32 word, int i)
+{
+   asm ("rotlw %0,%0,%2"
+      :"=r" (word)
+      :"0" (word),"r" (i));
+   return word;
+}
+
+static inline ulong32 ROR(ulong32 word, int i)
+{
+   asm ("rotlw %0,%0,%2"
+      :"=r" (word)
+      :"0" (word),"r" (32-i));
+   return word;
+}
+
+#ifndef LTC_NO_ROLC
+
+static inline ulong32 ROLc(ulong32 word, const int i)
+{
+   asm ("rotlwi %0,%0,%2"
+      :"=r" (word)
+      :"0" (word),"I" (i));
+   return word;
+}
+
+static inline ulong32 RORc(ulong32 word, const int i)
+{
+   asm ("rotrwi %0,%0,%2"
+      :"=r" (word)
+      :"0" (word),"I" (i));
+   return word;
+}
+
+#else
+
+#define ROLc ROL
+#define RORc ROR
+
+#endif
+
+
+#else
+
+/* rotates the hard way */
+#define ROL(x, y) ( (((ulong32)(x)<<(ulong32)((y)&31)) | (((ulong32)(x)&0xFFFFFFFFUL)>>(ulong32)((32-((y)&31))&31))) & 0xFFFFFFFFUL)
+#define ROR(x, y) ( ((((ulong32)(x)&0xFFFFFFFFUL)>>(ulong32)((y)&31)) | ((ulong32)(x)<<(ulong32)((32-((y)&31))&31))) & 0xFFFFFFFFUL)
+#define ROLc(x, y) ( (((ulong32)(x)<<(ulong32)((y)&31)) | (((ulong32)(x)&0xFFFFFFFFUL)>>(ulong32)((32-((y)&31))&31))) & 0xFFFFFFFFUL)
+#define RORc(x, y) ( ((((ulong32)(x)&0xFFFFFFFFUL)>>(ulong32)((y)&31)) | ((ulong32)(x)<<(ulong32)((32-((y)&31))&31))) & 0xFFFFFFFFUL)
+
+#endif
+
+
+/* 64-bit Rotates */
+#if !defined(__STRICT_ANSI__) && defined(__GNUC__) && defined(__x86_64__) && !defined(_WIN64) && !defined(LTC_NO_ASM)
+
+static inline ulong64 ROL64(ulong64 word, int i)
+{
+   asm("rolq %%cl,%0"
+      :"=r" (word)
+      :"0" (word),"c" (i));
+   return word;
+}
+
+static inline ulong64 ROR64(ulong64 word, int i)
+{
+   asm("rorq %%cl,%0"
+      :"=r" (word)
+      :"0" (word),"c" (i));
+   return word;
+}
+
+#ifndef LTC_NO_ROLC
+
+#define ROL64c(word,i) ({ \
+   ulong64 __ROL64c_tmp = word; \
+   __asm__ ("rolq %2, %0" : \
+            "=r" (__ROL64c_tmp) : \
+            "0" (__ROL64c_tmp), \
+            "J" (i)); \
+            __ROL64c_tmp; \
+   })
+#define ROR64c(word,i) ({ \
+   ulong64 __ROR64c_tmp = word; \
+   __asm__ ("rorq %2, %0" : \
+            "=r" (__ROR64c_tmp) : \
+            "0" (__ROR64c_tmp), \
+            "J" (i)); \
+            __ROR64c_tmp; \
+   })
+
+#else /* LTC_NO_ROLC */
+
+#define ROL64c ROL64
+#define ROR64c ROR64
+
+#endif
+
+#else /* Not x86_64  */
+
+#define ROL64(x, y) \
+    ( (((x)<<((ulong64)(y)&63)) | \
+      (((x)&CONST64(0xFFFFFFFFFFFFFFFF))>>(((ulong64)64-((y)&63))&63))) & CONST64(0xFFFFFFFFFFFFFFFF))
+
+#define ROR64(x, y) \
+    ( ((((x)&CONST64(0xFFFFFFFFFFFFFFFF))>>((ulong64)(y)&CONST64(63))) | \
+      ((x)<<(((ulong64)64-((y)&63))&63))) & CONST64(0xFFFFFFFFFFFFFFFF))
+
+#define ROL64c(x, y) \
+    ( (((x)<<((ulong64)(y)&63)) | \
+      (((x)&CONST64(0xFFFFFFFFFFFFFFFF))>>(((ulong64)64-((y)&63))&63))) & CONST64(0xFFFFFFFFFFFFFFFF))
+
+#define ROR64c(x, y) \
+    ( ((((x)&CONST64(0xFFFFFFFFFFFFFFFF))>>((ulong64)(y)&CONST64(63))) | \
+      ((x)<<(((ulong64)64-((y)&63))&63))) & CONST64(0xFFFFFFFFFFFFFFFF))
+
+#endif
+
+#ifndef MAX
+   #define MAX(x, y) ( ((x)>(y))?(x):(y) )
+#endif
+
+#ifndef MIN
+   #define MIN(x, y) ( ((x)<(y))?(x):(y) )
+#endif
+
+#ifndef LTC_UNUSED_PARAM
+   #define LTC_UNUSED_PARAM(x) (void)(x)
+#endif
+
+/* there is no snprintf before Visual C++ 2015 */
+#if defined(_MSC_VER) && _MSC_VER < 1900
+#define snprintf _snprintf
+#endif
+
+void memcpy(char *s1, char *s2, size_t n) {
+	for(int i = 0; i < n; i++) {
+		s1[i] = s2[i];
+	}
+}
+
+#define XMEMCPY memcpy
+//#define XMEMCPY(DST, SRC, SIZE) for(int i = 0; i < SIZE; i++) { DST[i] = SRC[i]; }
+
+/* a simple macro for making hash "process" functions */
+#define HASH_PROCESS(func_name, compress_name, state_var, block_size)                       \
+int func_name (hash_state * md, const unsigned char *in, unsigned long inlen)               \
+{                                                                                           \
+    unsigned long n;                                                                        \
+    int           err;                                                          \
+    if (md-> state_var .curlen > sizeof(md-> state_var .buf)) {                             \
+       return CRYPT_INVALID_ARG;                                                            \
+    }                                                                                       \
+    if ((md-> state_var .length + inlen) < md-> state_var .length) {                        \
+      return CRYPT_HASH_OVERFLOW;                                                           \
+    }                                                                                       \
+    while (inlen > 0) {                                                                     \
+        if (md-> state_var .curlen == 0 && inlen >= block_size) {                           \
+           if ((err = compress_name (md, in)) != CRYPT_OK) {                                \
+              return err;                                                                   \
+           }                                                                                \
+           md-> state_var .length += block_size * 8;                                        \
+           in             += block_size;                                                    \
+           inlen          -= block_size;                                                    \
+        } else {                                                                            \
+           n = MIN(inlen, (block_size - md-> state_var .curlen));                           \
+           XMEMCPY(md-> state_var .buf + md-> state_var.curlen, in, (size_t)n);             \
+           md-> state_var .curlen += n;                                                     \
+           in             += n;                                                             \
+           inlen          -= n;                                                             \
+           if (md-> state_var .curlen == block_size) {                                      \
+              if ((err = compress_name (md, md-> state_var .buf)) != CRYPT_OK) {            \
+                 return err;                                                                \
+              }                                                                             \
+              md-> state_var .length += 8*block_size;                                       \
+              md-> state_var .curlen = 0;                                                   \
+           }                                                                                \
+       }                                                                                    \
+    }                                                                                       \
+    return CRYPT_OK;                                                                        \
+}
+
+/* LibTomCrypt, modular cryptographic library -- Tom St Denis
+ *
+ * LibTomCrypt is a library that provides various cryptographic
+ * algorithms in a highly modular and flexible manner.
+ *
+ * The library is free for all purposes without any express
+ * guarantee it works.
+ */
+
+/**
+  @file sha256.c
+  LTC_SHA256 by Tom St Denis
+*/
+
+#ifndef __CUDACC__
+
+#define __device__
+#define __host__
+
+#endif
+
+#define SHA256_BLOCK_SIZE 32
+
+struct sha256_state {
+    ulong64 length;
+    ulong32 state[8], curlen;
+    unsigned char buf[64];
+};
+
+typedef struct {
+    struct sha256_state sha256;
+} hash_state;
+
+#ifdef LTC_SMALL_CODE
+/* the K array */
+static __constant ulong32 K[64] = {
+    0x428a2f98UL, 0x71374491UL, 0xb5c0fbcfUL, 0xe9b5dba5UL, 0x3956c25bUL,
+    0x59f111f1UL, 0x923f82a4UL, 0xab1c5ed5UL, 0xd807aa98UL, 0x12835b01UL,
+    0x243185beUL, 0x550c7dc3UL, 0x72be5d74UL, 0x80deb1feUL, 0x9bdc06a7UL,
+    0xc19bf174UL, 0xe49b69c1UL, 0xefbe4786UL, 0x0fc19dc6UL, 0x240ca1ccUL,
+    0x2de92c6fUL, 0x4a7484aaUL, 0x5cb0a9dcUL, 0x76f988daUL, 0x983e5152UL,
+    0xa831c66dUL, 0xb00327c8UL, 0xbf597fc7UL, 0xc6e00bf3UL, 0xd5a79147UL,
+    0x06ca6351UL, 0x14292967UL, 0x27b70a85UL, 0x2e1b2138UL, 0x4d2c6dfcUL,
+    0x53380d13UL, 0x650a7354UL, 0x766a0abbUL, 0x81c2c92eUL, 0x92722c85UL,
+    0xa2bfe8a1UL, 0xa81a664bUL, 0xc24b8b70UL, 0xc76c51a3UL, 0xd192e819UL,
+    0xd6990624UL, 0xf40e3585UL, 0x106aa070UL, 0x19a4c116UL, 0x1e376c08UL,
+    0x2748774cUL, 0x34b0bcb5UL, 0x391c0cb3UL, 0x4ed8aa4aUL, 0x5b9cca4fUL,
+    0x682e6ff3UL, 0x748f82eeUL, 0x78a5636fUL, 0x84c87814UL, 0x8cc70208UL,
+    0x90befffaUL, 0xa4506cebUL, 0xbef9a3f7UL, 0xc67178f2UL
+};
+#endif
+
+/* Various logical functions */
+#define Ch(x,y,z)       (z ^ (x & (y ^ z)))
+#define Maj(x,y,z)      (((x | y) & z) | (x & y))
+#define S(x, n)         RORc((x),(n))
+#define R(x, n)         (((x)&0xFFFFFFFFUL)>>(n))
+#define Sigma0(x)       (S(x, 2) ^ S(x, 13) ^ S(x, 22))
+#define Sigma1(x)       (S(x, 6) ^ S(x, 11) ^ S(x, 25))
+#define Gamma0(x)       (S(x, 7) ^ S(x, 18) ^ R(x, 3))
+#define Gamma1(x)       (S(x, 17) ^ S(x, 19) ^ R(x, 10))
+
+/* compress 512-bits */
+#ifdef LTC_CLEAN_STACK
+static int _sha256_compress(hash_state * md, const unsigned char *buf)
+#else
+static int sha256_compress(hash_state * md, const unsigned char *buf)
+#endif
+{
+    ulong32 S[8], W[64], t0, t1;
+#ifdef LTC_SMALL_CODE
+    ulong32 t;
+#endif
+    int i;
+
+    /* copy state into S */
+    for (i = 0; i < 8; i++) {
+        S[i] = md->sha256.state[i];
+    }
+
+    /* copy the state into 512-bits into W[0..15] */
+    for (i = 0; i < 16; i++) {
+        LOAD32H(W[i], buf + (4*i));
+    }
+
+    /* fill W[16..63] */
+    for (i = 16; i < 64; i++) {
+        W[i] = Gamma1(W[i - 2]) + W[i - 7] + Gamma0(W[i - 15]) + W[i - 16];
+    }
+
+    /* Compress */
+#ifdef LTC_SMALL_CODE
+#define RND(a,b,c,d,e,f,g,h,i)                         \
+     t0 = h + Sigma1(e) + Ch(e, f, g) + K[i] + W[i];   \
+     t1 = Sigma0(a) + Maj(a, b, c);                    \
+     d += t0;                                          \
+     h  = t0 + t1;
+
+     for (i = 0; i < 64; ++i) {
+         RND(S[0],S[1],S[2],S[3],S[4],S[5],S[6],S[7],i);
+         t = S[7]; S[7] = S[6]; S[6] = S[5]; S[5] = S[4];
+         S[4] = S[3]; S[3] = S[2]; S[2] = S[1]; S[1] = S[0]; S[0] = t;
+     }
+#else
+#define RND(a,b,c,d,e,f,g,h,i,ki)                    \
+     t0 = h + Sigma1(e) + Ch(e, f, g) + ki + W[i];   \
+     t1 = Sigma0(a) + Maj(a, b, c);                  \
+     d += t0;                                        \
+     h  = t0 + t1;
+
+    RND(S[0],S[1],S[2],S[3],S[4],S[5],S[6],S[7],0,0x428a2f98);
+    RND(S[7],S[0],S[1],S[2],S[3],S[4],S[5],S[6],1,0x71374491);
+    RND(S[6],S[7],S[0],S[1],S[2],S[3],S[4],S[5],2,0xb5c0fbcf);
+    RND(S[5],S[6],S[7],S[0],S[1],S[2],S[3],S[4],3,0xe9b5dba5);
+    RND(S[4],S[5],S[6],S[7],S[0],S[1],S[2],S[3],4,0x3956c25b);
+    RND(S[3],S[4],S[5],S[6],S[7],S[0],S[1],S[2],5,0x59f111f1);
+    RND(S[2],S[3],S[4],S[5],S[6],S[7],S[0],S[1],6,0x923f82a4);
+    RND(S[1],S[2],S[3],S[4],S[5],S[6],S[7],S[0],7,0xab1c5ed5);
+    RND(S[0],S[1],S[2],S[3],S[4],S[5],S[6],S[7],8,0xd807aa98);
+    RND(S[7],S[0],S[1],S[2],S[3],S[4],S[5],S[6],9,0x12835b01);
+    RND(S[6],S[7],S[0],S[1],S[2],S[3],S[4],S[5],10,0x243185be);
+    RND(S[5],S[6],S[7],S[0],S[1],S[2],S[3],S[4],11,0x550c7dc3);
+    RND(S[4],S[5],S[6],S[7],S[0],S[1],S[2],S[3],12,0x72be5d74);
+    RND(S[3],S[4],S[5],S[6],S[7],S[0],S[1],S[2],13,0x80deb1fe);
+    RND(S[2],S[3],S[4],S[5],S[6],S[7],S[0],S[1],14,0x9bdc06a7);
+    RND(S[1],S[2],S[3],S[4],S[5],S[6],S[7],S[0],15,0xc19bf174);
+    RND(S[0],S[1],S[2],S[3],S[4],S[5],S[6],S[7],16,0xe49b69c1);
+    RND(S[7],S[0],S[1],S[2],S[3],S[4],S[5],S[6],17,0xefbe4786);
+    RND(S[6],S[7],S[0],S[1],S[2],S[3],S[4],S[5],18,0x0fc19dc6);
+    RND(S[5],S[6],S[7],S[0],S[1],S[2],S[3],S[4],19,0x240ca1cc);
+    RND(S[4],S[5],S[6],S[7],S[0],S[1],S[2],S[3],20,0x2de92c6f);
+    RND(S[3],S[4],S[5],S[6],S[7],S[0],S[1],S[2],21,0x4a7484aa);
+    RND(S[2],S[3],S[4],S[5],S[6],S[7],S[0],S[1],22,0x5cb0a9dc);
+    RND(S[1],S[2],S[3],S[4],S[5],S[6],S[7],S[0],23,0x76f988da);
+    RND(S[0],S[1],S[2],S[3],S[4],S[5],S[6],S[7],24,0x983e5152);
+    RND(S[7],S[0],S[1],S[2],S[3],S[4],S[5],S[6],25,0xa831c66d);
+    RND(S[6],S[7],S[0],S[1],S[2],S[3],S[4],S[5],26,0xb00327c8);
+    RND(S[5],S[6],S[7],S[0],S[1],S[2],S[3],S[4],27,0xbf597fc7);
+    RND(S[4],S[5],S[6],S[7],S[0],S[1],S[2],S[3],28,0xc6e00bf3);
+    RND(S[3],S[4],S[5],S[6],S[7],S[0],S[1],S[2],29,0xd5a79147);
+    RND(S[2],S[3],S[4],S[5],S[6],S[7],S[0],S[1],30,0x06ca6351);
+    RND(S[1],S[2],S[3],S[4],S[5],S[6],S[7],S[0],31,0x14292967);
+    RND(S[0],S[1],S[2],S[3],S[4],S[5],S[6],S[7],32,0x27b70a85);
+    RND(S[7],S[0],S[1],S[2],S[3],S[4],S[5],S[6],33,0x2e1b2138);
+    RND(S[6],S[7],S[0],S[1],S[2],S[3],S[4],S[5],34,0x4d2c6dfc);
+    RND(S[5],S[6],S[7],S[0],S[1],S[2],S[3],S[4],35,0x53380d13);
+    RND(S[4],S[5],S[6],S[7],S[0],S[1],S[2],S[3],36,0x650a7354);
+    RND(S[3],S[4],S[5],S[6],S[7],S[0],S[1],S[2],37,0x766a0abb);
+    RND(S[2],S[3],S[4],S[5],S[6],S[7],S[0],S[1],38,0x81c2c92e);
+    RND(S[1],S[2],S[3],S[4],S[5],S[6],S[7],S[0],39,0x92722c85);
+    RND(S[0],S[1],S[2],S[3],S[4],S[5],S[6],S[7],40,0xa2bfe8a1);
+    RND(S[7],S[0],S[1],S[2],S[3],S[4],S[5],S[6],41,0xa81a664b);
+    RND(S[6],S[7],S[0],S[1],S[2],S[3],S[4],S[5],42,0xc24b8b70);
+    RND(S[5],S[6],S[7],S[0],S[1],S[2],S[3],S[4],43,0xc76c51a3);
+    RND(S[4],S[5],S[6],S[7],S[0],S[1],S[2],S[3],44,0xd192e819);
+    RND(S[3],S[4],S[5],S[6],S[7],S[0],S[1],S[2],45,0xd6990624);
+    RND(S[2],S[3],S[4],S[5],S[6],S[7],S[0],S[1],46,0xf40e3585);
+    RND(S[1],S[2],S[3],S[4],S[5],S[6],S[7],S[0],47,0x106aa070);
+    RND(S[0],S[1],S[2],S[3],S[4],S[5],S[6],S[7],48,0x19a4c116);
+    RND(S[7],S[0],S[1],S[2],S[3],S[4],S[5],S[6],49,0x1e376c08);
+    RND(S[6],S[7],S[0],S[1],S[2],S[3],S[4],S[5],50,0x2748774c);
+    RND(S[5],S[6],S[7],S[0],S[1],S[2],S[3],S[4],51,0x34b0bcb5);
+    RND(S[4],S[5],S[6],S[7],S[0],S[1],S[2],S[3],52,0x391c0cb3);
+    RND(S[3],S[4],S[5],S[6],S[7],S[0],S[1],S[2],53,0x4ed8aa4a);
+    RND(S[2],S[3],S[4],S[5],S[6],S[7],S[0],S[1],54,0x5b9cca4f);
+    RND(S[1],S[2],S[3],S[4],S[5],S[6],S[7],S[0],55,0x682e6ff3);
+    RND(S[0],S[1],S[2],S[3],S[4],S[5],S[6],S[7],56,0x748f82ee);
+    RND(S[7],S[0],S[1],S[2],S[3],S[4],S[5],S[6],57,0x78a5636f);
+    RND(S[6],S[7],S[0],S[1],S[2],S[3],S[4],S[5],58,0x84c87814);
+    RND(S[5],S[6],S[7],S[0],S[1],S[2],S[3],S[4],59,0x8cc70208);
+    RND(S[4],S[5],S[6],S[7],S[0],S[1],S[2],S[3],60,0x90befffa);
+    RND(S[3],S[4],S[5],S[6],S[7],S[0],S[1],S[2],61,0xa4506ceb);
+    RND(S[2],S[3],S[4],S[5],S[6],S[7],S[0],S[1],62,0xbef9a3f7);
+    RND(S[1],S[2],S[3],S[4],S[5],S[6],S[7],S[0],63,0xc67178f2);
+
+#undef RND
+
+#endif
+
+    /* feedback */
+    for (i = 0; i < 8; i++) {
+        md->sha256.state[i] = md->sha256.state[i] + S[i];
+    }
+    return CRYPT_OK;
+}
+
+#ifdef LTC_CLEAN_STACK
+static int sha256_compress(hash_state * md, const unsigned char *buf)
+{
+    int err;
+    err = _sha256_compress(md, buf);
+    burn_stack(sizeof(ulong32) * 74);
+    return err;
+}
+#endif
+
+/**
+   Initialize the hash state
+   @param md   The hash state you wish to initialize
+   @return CRYPT_OK if successful
+*/
+inline int sha256_init(hash_state * md)
+{
+    md->sha256.curlen = 0;
+    md->sha256.length = 0;
+    md->sha256.state[0] = 0x6A09E667UL;
+    md->sha256.state[1] = 0xBB67AE85UL;
+    md->sha256.state[2] = 0x3C6EF372UL;
+    md->sha256.state[3] = 0xA54FF53AUL;
+    md->sha256.state[4] = 0x510E527FUL;
+    md->sha256.state[5] = 0x9B05688CUL;
+    md->sha256.state[6] = 0x1F83D9ABUL;
+    md->sha256.state[7] = 0x5BE0CD19UL;
+    return CRYPT_OK;
+}
+
+/**
+   Process a block of memory though the hash
+   @param md     The hash state
+   @param in     The data to hash
+   @param inlen  The length of the data (octets)
+   @return CRYPT_OK if successful
+*/
+inline HASH_PROCESS(sha256_process, sha256_compress, sha256, 64)
+
+/**
+   Terminate the hash to get the digest
+   @param md  The hash state
+   @param out [out] The destination of the hash (32 bytes)
+   @return CRYPT_OK if successful
+*/
+inline int sha256_done(hash_state * md, unsigned char *out)
+{
+    int i;
+
+    if (md->sha256.curlen >= sizeof(md->sha256.buf)) {
+       return CRYPT_INVALID_ARG;
+    }
+
+
+    /* increase the length of the message */
+    md->sha256.length += md->sha256.curlen * 8;
+
+    /* append the '1' bit */
+    md->sha256.buf[md->sha256.curlen++] = (unsigned char)0x80;
+
+    /* if the length is currently above 56 bytes we append zeros
+     * then compress.  Then we can fall back to padding zeros and length
+     * encoding like normal.
+     */
+    if (md->sha256.curlen > 56) {
+        while (md->sha256.curlen < 64) {
+            md->sha256.buf[md->sha256.curlen++] = (unsigned char)0;
+        }
+        sha256_compress(md, md->sha256.buf);
+        md->sha256.curlen = 0;
+    }
+
+    /* pad upto 56 bytes of zeroes */
+    while (md->sha256.curlen < 56) {
+        md->sha256.buf[md->sha256.curlen++] = (unsigned char)0;
+    }
+
+    /* store length */
+    STORE64H(md->sha256.length, md->sha256.buf+56);
+    sha256_compress(md, md->sha256.buf);
+
+    /* copy output */
+    for (i = 0; i < 8; i++) {
+        STORE32H(md->sha256.state[i], out+(4*i));
+    }
+#ifdef LTC_CLEAN_STACK
+    zeromem(md, sizeof(hash_state));
+#endif
+    return CRYPT_OK;
+}
+
+/**
+  Self-test the hash
+  @return CRYPT_OK if successful, CRYPT_NOP if self-tests have been disabled
+*/
+#if 0
+int  sha256_test(void)
+{
+ #ifndef LTC_TEST
+    return CRYPT_NOP;
+ #else
+  static const struct {
+      const char *msg;
+      unsigned char hash[32];
+  } tests[] = {
+    { "abc",
+      { 0xba, 0x78, 0x16, 0xbf, 0x8f, 0x01, 0xcf, 0xea,
+        0x41, 0x41, 0x40, 0xde, 0x5d, 0xae, 0x22, 0x23,
+        0xb0, 0x03, 0x61, 0xa3, 0x96, 0x17, 0x7a, 0x9c,
+        0xb4, 0x10, 0xff, 0x61, 0xf2, 0x00, 0x15, 0xad }
+    },
+    { "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq",
+      { 0x24, 0x8d, 0x6a, 0x61, 0xd2, 0x06, 0x38, 0xb8,
+        0xe5, 0xc0, 0x26, 0x93, 0x0c, 0x3e, 0x60, 0x39,
+        0xa3, 0x3c, 0xe4, 0x59, 0x64, 0xff, 0x21, 0x67,
+        0xf6, 0xec, 0xed, 0xd4, 0x19, 0xdb, 0x06, 0xc1 }
+    },
+  };
+
+  int i;
+  unsigned char tmp[32];
+  hash_state md;
+
+  for (i = 0; i < (int)(sizeof(tests) / sizeof(tests[0])); i++) {
+      sha256_init(&md);
+      sha256_process(&md, (unsigned char*)tests[i].msg, (unsigned long)strlen(tests[i].msg));
+      sha256_done(&md, tmp);
+      if (compare_testvector(tmp, sizeof(tmp), tests[i].hash, sizeof(tests[i].hash), "SHA256", i)) {
+         return CRYPT_FAIL_TESTVECTOR;
+      }
+  }
+  return CRYPT_OK;
+ #endif
+}
+#endif
+
+/* ref:         $Format:%D$ */
+/* git commit:  $Format:%H$ */
+/* commit time: $Format:%ai$ */
+
+
 /*
 The set of scalars is \Z/l
 where l = 2^252 + 27742317777372353535851937790883648493.
@@ -111,15 +942,6 @@ __constant uint64_t K[80] = {
          (((uint64_t)((y)[4] & 255))<<24)|(((uint64_t)((y)[5] & 255))<<16) | \
          (((uint64_t)((y)[6] & 255))<<8)|(((uint64_t)((y)[7] & 255))); }
 
-
-#define Ch(x,y,z)       (z ^ (x & (y ^ z)))
-#define Maj(x,y,z)      (((x | y) & z) | (x & y))
-#define S(x, n)         ROR64c(x, n)
-#define R(x, n)         (((x) &UINT64_C(0xFFFFFFFFFFFFFFFF))>>((uint64_t)n))
-#define Sigma0(x)       (S(x, 28) ^ S(x, 34) ^ S(x, 39))
-#define Sigma1(x)       (S(x, 14) ^ S(x, 18) ^ S(x, 41))
-#define Gamma0(x)       (S(x, 1) ^ S(x, 8) ^ R(x, 7))
-#define Gamma1(x)       (S(x, 19) ^ S(x, 61) ^ R(x, 6))
 #ifndef MIN
    #define MIN(x, y) ( ((x)<(y))?(x):(y) )
 #endif
@@ -349,7 +1171,7 @@ typedef struct {
 
 void ED25519_DECLSPEC ed25519_create_keypair(unsigned char *public_key, unsigned char *private_key, const unsigned char *seed);
 void ED25519_DECLSPEC ed25519_sign(unsigned char *signature, const unsigned char *message, size_t message_len, const unsigned char *public_key, const unsigned char *private_key);
-int ED25519_DECLSPEC ed25519_verify(const unsigned char *signature, const unsigned char *message, uint32_t message_len, const unsigned char *public_key);
+int ED25519_DECLSPEC ed25519_verify(__global const unsigned char *signature, __global const unsigned char *message, uint32_t message_len, __global const unsigned char *public_key);
 void ED25519_DECLSPEC ed25519_verify_many(const gpu_Elems* elems, uint32_t num_elems, uint32_t message_size, uint32_t total_packets, uint32_t total_signatures, const uint32_t* message_lens, const uint32_t* public_key_offset, const uint32_t* signature_offset, const uint32_t* message_start_offset, uint8_t* out, uint8_t use_non_default_stream);
 void ED25519_DECLSPEC ed25519_add_scalar(unsigned char *public_key, unsigned char *private_key, const unsigned char *scalar);
 void ED25519_DECLSPEC ed25519_key_exchange(unsigned char *shared_secret, const unsigned char *public_key, const unsigned char *private_key);
@@ -384,6 +1206,27 @@ void ed25519_create_keypair(unsigned char *public_key, unsigned char *private_ke
 
     ge_scalarmult_base(&A, private_key);
     ge_p3_tobytes(public_key, &A);
+}
+
+static uint64_t load_3(const unsigned char *in) {
+    uint64_t result;
+
+    result = (uint64_t) in[0];
+    result |= ((uint64_t) in[1]) << 8;
+    result |= ((uint64_t) in[2]) << 16;
+
+    return result;
+}
+
+static uint64_t load_4(const unsigned char *in) {
+    uint64_t result;
+
+    result = (uint64_t) in[0];
+    result |= ((uint64_t) in[1]) << 8;
+    result |= ((uint64_t) in[2]) << 16;
+    result |= ((uint64_t) in[3]) << 24;
+    
+    return result;
 }
 
 
@@ -1239,6 +2082,12 @@ B is the Ed25519 base point (x,4/5) with x positive.
 void ge_double_scalarmult_vartime(ge_p2 *r, const unsigned char *a, const ge_p3 *A, const unsigned char *b) {
     signed char aslide[256];
     signed char bslide[256];
+	
+	ge_precomp Bi_priv[8];
+	for(int i = 0; i < 8; i++) {
+			Bi_priv[i] = Bi[i];
+	}
+	
     ge_cached Ai[8]; /* A,3A,5A,7A,9A,11A,13A,15A */
     ge_p1p1 t;
     ge_p3 u;
@@ -1291,10 +2140,12 @@ void ge_double_scalarmult_vartime(ge_p2 *r, const unsigned char *a, const ge_p3 
 
         if (bslide[i] > 0) {
             ge_p1p1_to_p3(&u, &t);
-            ge_madd(&t, &u, &Bi[bslide[i] / 2]);
+			// TODO fixme OpenCL constant=>global
+            ge_madd(&t, &u, &Bi_priv[bslide[i] / 2]);
         } else if (bslide[i] < 0) {
             ge_p1p1_to_p3(&u, &t);
-            ge_msub(&t, &u, &Bi[(-bslide[i]) / 2]);
+			// TODO fixme OpenCL constant=>global
+            ge_msub(&t, &u, &Bi_priv[(-bslide[i]) / 2]);
         }
 
         ge_p1p1_to_p2(r, &t);
@@ -1310,6 +2161,14 @@ __constant fe sqrtm1 = {
 };
 
 int ge_frombytes_negate_vartime(ge_p3 *h, const unsigned char *s) {
+	// OpenCL fix
+	fe priv_d = {
+    -10913610, 13857413, -15372611, 6949391, 114729, -8787816, -6275908, -3247719, -18696448, -12055116
+};
+	fe priv_sqrtm1 = {
+    -32595792, -7943725, 9377950, 3500415, 12389472, -272473, -25146209, -2005654, 326686, 11406482
+};
+	
     fe u;
     fe v;
     fe v3;
@@ -1318,7 +2177,7 @@ int ge_frombytes_negate_vartime(ge_p3 *h, const unsigned char *s) {
     fe_frombytes(h->Y, s);
     fe_1(h->Z);
     fe_sq(u, h->Y);
-    fe_mul(v, u, d);
+    fe_mul(v, u, priv_d); // OpenCL check
     fe_sub(u, u, h->Z);     /* u = y^2-1 */
     fe_add(v, v, h->Z);     /* v = dy^2+1 */
     fe_sq(v3, v);
@@ -1340,7 +2199,7 @@ int ge_frombytes_negate_vartime(ge_p3 *h, const unsigned char *s) {
             return -1;
         }
 
-        fe_mul(h->X, h->X, sqrtm1);
+        fe_mul(h->X, h->X, priv_sqrtm1);
     }
 
     if (fe_isnegative(h->X) == (s[31] >> 7)) {
@@ -1356,7 +2215,7 @@ int ge_frombytes_negate_vartime(ge_p3 *h, const unsigned char *s) {
 r = p + q
 */
 
-inline void ge_madd(ge_p1p1 *r, const ge_p3 *p, __constant ge_precomp *q) {
+inline void ge_madd(ge_p1p1 *r, const ge_p3 *p, const ge_precomp *q) {
     fe t0;
     fe_add(r->X, p->Y, p->X);
     fe_sub(r->Y, p->Y, p->X);
@@ -1375,7 +2234,7 @@ inline void ge_madd(ge_p1p1 *r, const ge_p3 *p, __constant ge_precomp *q) {
 r = p - q
 */
 
-inline void ge_msub(ge_p1p1 *r, const ge_p3 *p, __constant ge_precomp *q) {
+inline void ge_msub(ge_p1p1 *r, const ge_p3 *p, const ge_precomp *q) {
     fe t0;
 
     fe_add(r->X, p->Y, p->X);
@@ -1474,7 +2333,8 @@ void ge_p3_to_cached(ge_cached *r, const ge_p3 *p) {
     fe_add(r->YplusX, p->Y, p->X);
     fe_sub(r->YminusX, p->Y, p->X);
     fe_copy(r->Z, p->Z);
-    fe_mul(r->T2d, p->T, d2);
+    // FIXME OpenCL generic to constant
+	//fe_mul(r->T2d, p->T, d2);
 }
 
 
@@ -1517,28 +2377,35 @@ static unsigned char negative(signed char b) {
     return (unsigned char) x;
 }
 
-static void cmov(ge_precomp *t, const ge_precomp *u, unsigned char b) {
+static void cmov(const ge_precomp *t, const ge_precomp *u, unsigned char b) {
     fe_cmov(t->yplusx, u->yplusx, b);
     fe_cmov(t->yminusx, u->yminusx, b);
     fe_cmov(t->xy2d, u->xy2d, b);
 }
 
-
-static void select(ge_precomp *t, int pos, signed char b) {
+// TODO fix naming OpenCL
+static void select_func(const ge_precomp *t, int pos, signed char b) {
     ge_precomp minust;
     unsigned char bnegative = negative(b);
     unsigned char babs = b - (((-bnegative) & b) << 1);
     fe_1(t->yplusx);
     fe_1(t->yminusx);
     fe_0(t->xy2d);
-    cmov(t, &base[pos][0], equal(babs, 1));
-    cmov(t, &base[pos][1], equal(babs, 2));
-    cmov(t, &base[pos][2], equal(babs, 3));
-    cmov(t, &base[pos][3], equal(babs, 4));
-    cmov(t, &base[pos][4], equal(babs, 5));
-    cmov(t, &base[pos][5], equal(babs, 6));
-    cmov(t, &base[pos][6], equal(babs, 7));
-    cmov(t, &base[pos][7], equal(babs, 8));
+	
+	// OpenCL fixme, constant => global
+	ge_precomp base_priv[8];
+	for(int i = 0; i < 8; i++) {
+		base_priv[i] = base[pos][i];
+	}
+	
+    cmov(t, &base_priv[0], equal(babs, 1));
+    cmov(t, &base_priv[1], equal(babs, 2));
+    cmov(t, &base_priv[2], equal(babs, 3));
+    cmov(t, &base_priv[3], equal(babs, 4));
+    cmov(t, &base_priv[4], equal(babs, 5));
+    cmov(t, &base_priv[5], equal(babs, 6));
+    cmov(t, &base_priv[6], equal(babs, 7));
+    cmov(t, &base_priv[7], equal(babs, 8));
     fe_copy(minust.yplusx, t->yminusx);
     fe_copy(minust.yminusx, t->yplusx);
     fe_neg(minust.xy2d, t->xy2d);
@@ -1583,7 +2450,9 @@ void ge_scalarmult_base(ge_p3 *h, const unsigned char *a) {
     ge_p3_0(h);
 
     for (i = 1; i < 64; i += 2) {
-        select(&t, i / 2, e[i]);
+		// TODO fixme OpenCL overloadable / private to global
+        select_func(&t, i / 2, e[i]);
+		// fix address space private to global
         ge_madd(&r, h, &t);
         ge_p1p1_to_p3(h, &r);
     }
@@ -1598,7 +2467,9 @@ void ge_scalarmult_base(ge_p3 *h, const unsigned char *a) {
     ge_p1p1_to_p3(h, &r);
 
     for (i = 0; i < 64; i += 2) {
-        select(&t, i / 2, e[i]);
+		// TODO fixme OpenCL overloadable
+        select_func(&t, i / 2, e[i]);
+		// fix address space private to global
         ge_madd(&r, h, &t);
         ge_p1p1_to_p3(h, &r);
     }
@@ -3142,10 +4013,10 @@ static int consttime_equal(const unsigned char *x, const unsigned char *y) {
 }
 
 static int
-ed25519_verify_device(const unsigned char *signature,
-                      const unsigned char *message,
+ed25519_verify_device(__global const unsigned char *signature,
+                      __global const unsigned char *message,
                       uint32_t message_len,
-                      const unsigned char *public_key) {
+                      __global const unsigned char *public_key) {
     unsigned char h[64];
     unsigned char checker[32];
     sha512_context hash;
@@ -3156,6 +4027,8 @@ ed25519_verify_device(const unsigned char *signature,
         return 0;
     }
 
+	// OpenCL fixme, address space private => global
+	/*
     if (ge_frombytes_negate_vartime(&A, public_key) != 0) {
         return 0;
     }
@@ -3173,26 +4046,27 @@ ed25519_verify_device(const unsigned char *signature,
     if (!consttime_equal(checker, signature)) {
         return 0;
     }
+	*/
 
     return 1;
 }
 
 int 
-ed25519_verify(const unsigned char *signature,
-               const unsigned char *message,
+ed25519_verify(__global const unsigned char *signature,
+               __global const unsigned char *message,
                uint32_t message_len,
-               const unsigned char *public_key) {
+               __global const unsigned char *public_key) {
     return ed25519_verify_device(signature, message, message_len, public_key);
 }
 
-void ed25519_verify_kernel(const uint8_t* packets,
+__kernel void ed25519_verify_kernel(__global const uint8_t* packets,
                                       uint32_t message_size,
-                                      uint32_t* message_lens,
-                                      uint32_t* public_key_offsets,
-                                      uint32_t* signature_offsets,
-                                      uint32_t* message_start_offsets,
-                                      size_t num_keys,
-                                      uint8_t* out)
+                                      __global uint32_t* message_lens,
+                                      __global uint32_t* public_key_offsets,
+                                      __global uint32_t* signature_offsets,
+                                      __global uint32_t* message_start_offsets,
+                                      uint32_t num_keys,
+                                      __global uint8_t* out)
 {
     int i = get_global_id(0);
     if (i < num_keys) {
@@ -3206,6 +4080,37 @@ void ed25519_verify_kernel(const uint8_t* packets,
                                        message_len,
                                        &packets[public_key_offset]);
     }
+}
+
+#define SHA256_BLOCK_SIZE 32
+
+__kernel void poh_verify_kernel(__global uint8_t* hashes, 
+	__global uint64_t* num_hashes_arr, 
+	uint32_t num_elems) {
+    uint32_t idx = get_global_id(0);
+    if (idx >= num_elems) return;
+
+    uint8_t hash[SHA256_BLOCK_SIZE];
+
+	// memcpy(hash, &hashes[idx * SHA256_BLOCK_SIZE], SHA256_BLOCK_SIZE);
+	for(int i = 0; i < SHA256_BLOCK_SIZE; i++) {
+		hash[i] = hashes[idx * SHA256_BLOCK_SIZE + i];
+	}
+    
+
+    for (size_t i = 0; i < num_hashes_arr[idx]; i++) {
+		//FIXME OpenCL
+        hash_state sha_state;
+        sha256_init(&sha_state);
+        sha256_process(&sha_state, hash, SHA256_BLOCK_SIZE);
+        sha256_done(&sha_state, hash);
+		//
+    }
+
+    //memcpy(&hashes[idx * SHA256_BLOCK_SIZE], hash, SHA256_BLOCK_SIZE);
+	for(int i = 0; i < SHA256_BLOCK_SIZE; i++) {
+		hashes[idx * SHA256_BLOCK_SIZE + i] = hash[i];
+	}
 }
 
 )"""";

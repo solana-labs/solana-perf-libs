@@ -895,6 +895,108 @@ __constant u32 rcon[] = {
 /**
  * Expand the cipher key into the encryption key schedule.
  */
+__kernel void AES_set_encrypt_key_kernel(
+			__global const unsigned char *userKey,
+			const int bits,
+			__global AES_KEY *key)
+{
+    __global u32 *rk;
+    int i = 0;
+    u32 temp;
+
+    if (!userKey || !key)
+        return;
+    if (bits != 128 && bits != 192 && bits != 256)
+        return;
+
+    rk = key->rd_key;
+
+    if (bits == 128)
+        key->rounds = 10;
+    else if (bits == 192)
+        key->rounds = 12;
+    else
+        key->rounds = 14;
+
+    rk[0] = GETU32(userKey     );
+    rk[1] = GETU32(userKey +  4);
+    rk[2] = GETU32(userKey +  8);
+    rk[3] = GETU32(userKey + 12);
+    if (bits == 128) {
+        while (1) {
+            temp  = rk[3];
+            rk[4] = rk[0] ^
+                (Te2(EB2(temp)) & 0xff000000) ^
+                (Te3(EB1(temp)) & 0x00ff0000) ^
+                (Te0(EB0(temp)) & 0x0000ff00) ^
+                (Te1(EB3(temp)) & 0x000000ff) ^
+                rcon[i];
+            rk[5] = rk[1] ^ rk[4];
+            rk[6] = rk[2] ^ rk[5];
+            rk[7] = rk[3] ^ rk[6];
+            if (++i == 10) {
+                return;
+            }
+            rk += 4;
+        }
+    }
+    rk[4] = GETU32(userKey + 16);
+    rk[5] = GETU32(userKey + 20);
+    if (bits == 192) {
+        while (1) {
+            temp = rk[ 5];
+            rk[ 6] = rk[ 0] ^
+                (Te2(EB2(temp)) & 0xff000000) ^
+                (Te3(EB1(temp)) & 0x00ff0000) ^
+                (Te0(EB0(temp)) & 0x0000ff00) ^
+                (Te1(EB3(temp)) & 0x000000ff) ^
+                rcon[i];
+            rk[ 7] = rk[ 1] ^ rk[ 6];
+            rk[ 8] = rk[ 2] ^ rk[ 7];
+            rk[ 9] = rk[ 3] ^ rk[ 8];
+            if (++i == 8) {
+                return;
+            }
+            rk[10] = rk[ 4] ^ rk[ 9];
+            rk[11] = rk[ 5] ^ rk[10];
+            rk += 6;
+        }
+    }
+    rk[6] = GETU32(userKey + 24);
+    rk[7] = GETU32(userKey + 28);
+    if (bits == 256) {
+        while (1) {
+            temp = rk[ 7];
+            rk[ 8] = rk[ 0] ^
+                (Te2(EB2(temp)) & 0xff000000) ^
+                (Te3(EB1(temp)) & 0x00ff0000) ^
+                (Te0(EB0(temp)) & 0x0000ff00) ^
+                (Te1(EB3(temp)) & 0x000000ff) ^
+                rcon[i];
+            rk[ 9] = rk[ 1] ^ rk[ 8];
+            rk[10] = rk[ 2] ^ rk[ 9];
+            rk[11] = rk[ 3] ^ rk[10];
+            if (++i == 7) {
+                return;
+            }
+            temp = rk[11];
+            rk[12] = rk[ 4] ^
+                (Te2((temp >> 24)       ) & 0xff000000) ^
+                (Te3((temp >> 16) & 0xff) & 0x00ff0000) ^
+                (Te0((temp >>  8) & 0xff) & 0x0000ff00) ^
+                (Te1((temp      ) & 0xff) & 0x000000ff);
+            rk[13] = rk[ 5] ^ rk[12];
+            rk[14] = rk[ 6] ^ rk[13];
+            rk[15] = rk[ 7] ^ rk[14];
+
+            rk += 8;
+            }
+    }
+}
+
+/**
+ * Expand the cipher key into the encryption key schedule.
+ */
 int AES_set_encrypt_key(const unsigned char *userKey, const int bits,
                         AES_KEY *key)
 {
@@ -1071,7 +1173,7 @@ int AES_set_decrypt_key(const unsigned char *userKey, const int bits,
 void AES_encrypt(__global unsigned char *in,
                  __global unsigned char *out,
 				 __global AES_KEY *key,
-				 __global const u32* te) {
+				 __constant const u32* te) {
 
     __global const u32 *rk;
     u32 s0, s1, s2, s3, t0, t1, t2, t3;
@@ -1678,7 +1780,7 @@ int AES_set_decrypt_key(__global unsigned char *userKey, const int bits,
 void aes_cbc128_encrypt(__global unsigned char* in, __global unsigned char* out,
 						uint32_t len, __global AES_KEY* key,
 						__global unsigned char* ivec,
-						__global const u32* l_te)
+						__constant const u32* l_te)
 {
     size_t n;
     __global unsigned char *iv = ivec;
@@ -1752,7 +1854,20 @@ void CRYPTO_cbc128_decrypt(__global unsigned char *in, __global unsigned char *o
         if (STRICT_ALIGNMENT &&
             ((size_t)in | (size_t)out | (size_t)ivec) % sizeof(size_t) != 0) {
             while (len >= 16) {
-                (*block) (in, out, key);
+				
+				// TODO fix OpenCL __global to private
+				unsigned char out_priv[16];
+				for(int i = 0; i < 16; i++) {
+					out_priv[i] = out[i];
+				}
+				
+                (*block) (in, out_priv, key);
+				
+				for(int i = 0; i < 16; i++) {
+					out[i] = out_priv[i];
+				}
+				
+				
                 for (n = 0; n < 16; ++n)
                     out[n] ^= iv[n];
                 iv = in;
@@ -1764,7 +1879,18 @@ void CRYPTO_cbc128_decrypt(__global unsigned char *in, __global unsigned char *o
             while (len >= 16) {
                 __global size_t *out_t = (__global size_t *)out, *iv_t = (__global size_t *)iv;
 
-                (*block) (in, out, key);
+				// TODO fix OpenCL __global to private
+				unsigned char out_priv[16];
+				for(int i = 0; i < 16; i++) {
+					out_priv[i] = out[i];
+				}
+
+                (*block) (in, out_priv, key);
+				
+				for(int i = 0; i < 16; i++) {
+					out[i] = out_priv[i];
+				}
+				
                 for (n = 0; n < 16 / sizeof(size_t); n++)
                     out_t[n] ^= iv_t[n];
                 iv = in;
@@ -1832,64 +1958,39 @@ void CRYPTO_cbc128_decrypt(__global unsigned char *in, __global unsigned char *o
 }
 
 
-void AES_cbc_encrypt(__global unsigned char *in, __global unsigned char *out,
-                     size_t len, __global AES_KEY *key,
-                     __global unsigned char *ivec, const int enc)
+__kernel void AES_cbc_encrypt_kernel(
+		__global unsigned char *in,
+		__global unsigned char *out,
+		uint32_t len,
+		__global AES_KEY *key,
+        __global unsigned char *ivec,
+		const int enc)
 {
-
     if (enc) {
-		
-		// TODO fix, store in global memory
-		// performance degradation
-		//__global u32 g_te[256];
-		//for(int i = 0; i < 256; i++) {
-		//	g_te[i] = g_Te0[i];
-		//}
-		
-		// TODO FIXME, BROKEN constant to global memory conversion
-        // aes_cbc128_encrypt(in, out, len, key, ivec, g_Te0);
+		// TODO check me
+        aes_cbc128_encrypt(in, out, len, key, ivec, g_Te0);
 	}
     else
         CRYPTO_cbc128_decrypt(in, out, len, key, ivec,
                               (block128_f) AES_decrypt);
 }
 
-__kernel void CRYPTO_cbc128_encrypt_kernel(__global unsigned char* input, __global unsigned char* output,
-                                             uint32_t length, __global AES_KEY* keys,
-                                             __global unsigned char* ivec, uint32_t num_keys,
-                                             __global unsigned char* sha_state,
-                                             __global uint32_t* sample_idx,
-                                             uint32_t sample_len,
-                                             uint32_t block_offset)
+__kernel void CRYPTO_cbc128_encrypt_kernel(__global unsigned char* input, 
+									__global unsigned char* output,
+									uint32_t length,
+									__global AES_KEY* keys,
+									__global unsigned char* ivec,
+									uint32_t num_keys,
+									__global unsigned char* sha_state,
+									__global uint32_t* sample_idx,
+									uint32_t sample_len,
+									uint32_t block_offset)
 {
     uint32_t i = (uint32_t)(get_global_id(0));
 
-//#if 0
-#ifdef __CUDA_ARCH__
-    __shared__ u32 l_te[256];
-    uint32_t tid = threadIdx.x;
-    l_te[tid] = g_Te0[tid];
-    __syncthreads();
-#else
-    //__local u32 l_te[256];
-	//l_te[i] = g_Te0[get_local_id(0)];
-	//barrier(CLK_LOCAL_MEM_FENCE);
-	
-	// TODO FIXME
-	// performance degradation
-	//__global u32 g_te[256];
-	//for(int i = 0; i < 256; i++) {
-	//	g_te[i] = g_Te0[i];
-	//}
-#endif
-
-    if (i < num_keys) { // TODO FIXME, BROKEN constant to global memory conversion
-        //aes_cbc128_encrypt(input, &output[i * length], length, &keys[i], &ivec[i * AES_BLOCK_SIZE], g_Te0);
-
-        /*for (uint32_t j = 0; j < sample_len; j++) {
-            if (sample_idx[j] > block_offset && sample_idx[j] < (block_offset + length)) {
-            }
-        }*/
+	// TODO check me
+    if (i < num_keys) { // TODO FIXME
+        aes_cbc128_encrypt(input, &output[i * length], length, &keys[i], &ivec[i * AES_BLOCK_SIZE], g_Te0);
     }
 }
 
