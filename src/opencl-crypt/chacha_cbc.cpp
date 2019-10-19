@@ -13,7 +13,7 @@ using namespace std;
 #endif
 
 #include <sha256.cu>
-#include "gpu_common.h"
+#include "cl_common.h"
 
 void chacha20_ctr_encrypt(
 			const uint8_t *in, 
@@ -78,16 +78,12 @@ void chacha20_ctr_encrypt(
 
 
 void chacha20_cbc_encrypt(const uint8_t *in, uint8_t *out, size_t length,
-                               const uint8_t key[CHACHA_KEY_SIZE], uint8_t* ivec)
+                          const uint8_t key[CHACHA_KEY_SIZE], uint8_t* ivec)
 {
 	DIE(cl_check_init() == false, "OpenCL could not be init");
     
     cl_int ret;
 
-    if (length < BLOCK_SIZE) {
-        printf("ERROR! block size(%d) > length(%zu)\n", BLOCK_SIZE, length);
-        return;
-    }
     cl_mem in_device;
     cl_mem keys_device;
     cl_mem out_device;
@@ -495,14 +491,15 @@ void chacha_ctr_encrypt_many(const unsigned char *in, unsigned char *out,
                              uint32_t num_keys,
                              float* time_us)
 {
-    DIE(cl_check_init() == false, "OpenCL could not be init");
-    
-    cl_int ret;
-
     if (length < BLOCK_SIZE) {
         printf("ERROR! block size(%d) > length(%zu)\n", BLOCK_SIZE, length);
         return;
     }
+
+    DIE(cl_check_init() == false, "OpenCL could not be init");
+    
+    cl_int ret;
+
     cl_mem in_device;
     cl_mem keys_device;
     cl_mem out_device;

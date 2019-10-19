@@ -2,6 +2,55 @@ const char *kernels_verify_src = R""""(
 
 ////////////////////////////////////////////////////////////////////////////////////
 
+int sha512_init(sha512_context * md);
+int sha512_final(sha512_context * md, unsigned char *out);
+int sha512_final_public(sha512_context * md, __global unsigned char *out);
+int sha512_update(sha512_context * md, __global const unsigned char *in, size_t inlen);
+int sha512(__global const unsigned char *message, size_t message_len, __global unsigned char *out);
+
+void fe_0(fe h);
+void fe_1(fe h);
+
+void fe_frombytes(fe h, const unsigned char *s);
+void fe_tobytes(unsigned char *s, const fe h);
+
+void fe_copy(fe h, const fe f);
+int fe_isnegative(const fe f);
+int fe_isnonzero(const fe f);
+void fe_cmov(fe f, const fe g, unsigned int b);
+void fe_cswap(fe f, fe g, unsigned int b);
+
+void fe_neg(fe h, const fe f);
+void fe_add(fe h, const fe f, const fe g);
+void fe_invert(fe out, const fe z);
+void fe_sq(fe h, const fe f);
+void fe_sq2(fe h, const fe f);
+void fe_mul(fe h, const fe f, const fe g);
+void fe_mul121666(fe h, fe f);
+void fe_pow22523(fe out, const fe z);
+void fe_sub(fe h, const fe f, const fe g);
+
+void ge_p3_tobytes(unsigned char *s, const ge_p3 *h);
+void ge_tobytes(unsigned char *s, const ge_p2 *h);
+int ge_frombytes_negate_vartime(ge_p3 *h, const unsigned char *s);
+
+void ge_add(ge_p1p1 *r, const ge_p3 *p, const ge_cached *q);
+void ge_sub(ge_p1p1 *r, const ge_p3 *p, const ge_cached *q);
+void ge_double_scalarmult_vartime(ge_p2 *r, const unsigned char *a, const ge_p3 *A, const unsigned char *b);
+void ge_madd(ge_p1p1 *r, const ge_p3 *p, const ge_precomp *q);
+void ge_msub(ge_p1p1 *r, const ge_p3 *p, const ge_precomp *q);
+void ge_scalarmult_base(ge_p3 *h, const unsigned char *a);
+
+void ge_p1p1_to_p2(ge_p2 *r, const ge_p1p1 *p);
+void ge_p1p1_to_p3(ge_p3 *r, const ge_p1p1 *p);
+void ge_p2_0(ge_p2 *h);
+void ge_p2_dbl(ge_p1p1 *r, const ge_p2 *p);
+void ge_p3_0(ge_p3 *h);
+void ge_p3_dbl(ge_p1p1 *r, const ge_p3 *p);
+void ge_p3_to_cached(ge_cached *r, const ge_p3 *p);
+void ge_p3_to_p2(ge_p2 *r, const ge_p3 *p);
+
+
 /* LibTomCrypt, modular cryptographic library -- Tom St Denis
  *
  * LibTomCrypt is a library that provides various cryptographic
@@ -11,8 +60,9 @@ const char *kernels_verify_src = R""""(
  * guarantee it works.
  */
  
- 
-#define ENDIAN_NEUTRAL 1
+#ifndef NULL
+#define NULL	0
+#endif
 
 typedef uint64_t ulong64;
 typedef uint32_t ulong32;
@@ -260,7 +310,6 @@ do { x = (((ulong64)((y)[7] & 255))<<56)|(((ulong64)((y)[6] & 255))<<48) | \
 #define LTC_ROx_ASM
 
 /* instrinsic rotate */
-#include <stdlib.h>
 #pragma intrinsic(_lrotr,_lrotl)
 #define ROR(x,n) _lrotr(x,n)
 #define ROL(x,n) _lrotl(x,n)
@@ -423,20 +472,20 @@ static inline ulong64 ROR64(ulong64 word, int i)
 #else /* Not x86_64  */
 
 #define ROL64(x, y) \
-    ( (((x)<<((ulong64)(y)&63)) | \
-      (((x)&CONST64(0xFFFFFFFFFFFFFFFF))>>(((ulong64)64-((y)&63))&63))) & CONST64(0xFFFFFFFFFFFFFFFF))
+    ( (((x)<<((ulong)(y)&63)) | \
+      (((x)&UINT64_C(0xFFFFFFFFFFFFFFFF))>>(((ulong)64-((y)&63))&63))) & UINT64_C(0xFFFFFFFFFFFFFFFF))
 
 #define ROR64(x, y) \
-    ( ((((x)&CONST64(0xFFFFFFFFFFFFFFFF))>>((ulong64)(y)&CONST64(63))) | \
-      ((x)<<(((ulong64)64-((y)&63))&63))) & CONST64(0xFFFFFFFFFFFFFFFF))
+    ( ((((x)&UINT64_C(0xFFFFFFFFFFFFFFFF))>>((ulong)(y)&UINT64_C(63))) | \
+      ((x)<<(((ulong)64-((y)&63))&63))) & UINT64_C(0xFFFFFFFFFFFFFFFF))
 
 #define ROL64c(x, y) \
-    ( (((x)<<((ulong64)(y)&63)) | \
-      (((x)&CONST64(0xFFFFFFFFFFFFFFFF))>>(((ulong64)64-((y)&63))&63))) & CONST64(0xFFFFFFFFFFFFFFFF))
+    ( (((x)<<((ulong)(y)&63)) | \
+      (((x)&UINT64_C(0xFFFFFFFFFFFFFFFF))>>(((ulong)64-((y)&63))&63))) & UINT64_C(0xFFFFFFFFFFFFFFFF))
 
 #define ROR64c(x, y) \
-    ( ((((x)&CONST64(0xFFFFFFFFFFFFFFFF))>>((ulong64)(y)&CONST64(63))) | \
-      ((x)<<(((ulong64)64-((y)&63))&63))) & CONST64(0xFFFFFFFFFFFFFFFF))
+    ( ((((x)&UINT64_C(0xFFFFFFFFFFFFFFFF))>>((ulong)(y)&UINT64_C(63))) | \
+      ((x)<<(((ulong)64-((y)&63))&63))) & UINT64_C(0xFFFFFFFFFFFFFFFF))
 
 #endif
 
@@ -457,14 +506,13 @@ static inline ulong64 ROR64(ulong64 word, int i)
 #define snprintf _snprintf
 #endif
 
-void memcpy(char *s1, char *s2, size_t n) {
-	for(int i = 0; i < n; i++) {
-		s1[i] = s2[i];
+void memcpy(char *dst, char *src, size_t n) {
+	for(size_t i = 0; i < n; i++) {
+		dst[i] = src[i];
 	}
 }
 
-#define XMEMCPY memcpy
-//#define XMEMCPY(DST, SRC, SIZE) for(int i = 0; i < SIZE; i++) { DST[i] = SRC[i]; }
+#define XMEMCPY		memcpy
 
 /* a simple macro for making hash "process" functions */
 #define HASH_PROCESS(func_name, compress_name, state_var, block_size)                       \
@@ -559,12 +607,15 @@ static __constant ulong32 K[64] = {
 /* Various logical functions */
 #define Ch(x,y,z)       (z ^ (x & (y ^ z)))
 #define Maj(x,y,z)      (((x | y) & z) | (x & y))
-#define S(x, n)         RORc((x),(n))
-#define R(x, n)         (((x)&0xFFFFFFFFUL)>>(n))
-#define Sigma0(x)       (S(x, 2) ^ S(x, 13) ^ S(x, 22))
-#define Sigma1(x)       (S(x, 6) ^ S(x, 11) ^ S(x, 25))
-#define Gamma0(x)       (S(x, 7) ^ S(x, 18) ^ R(x, 3))
-#define Gamma1(x)       (S(x, 17) ^ S(x, 19) ^ R(x, 10))
+#define S(x, n)         ROR64c((x),(n))
+#define R(x, n)       	(((((ulong)x) & ((ulong)0xFFFFFFFFFFFFFFFFUL))) >> ((ulong)n))
+#define Sigma0(x)       (S(x, 28) ^ S(x, 34) ^ S(x, 39))
+#define Sigma1(x)       (S(x, 14) ^ S(x, 18) ^ S(x, 41))
+#define Gamma0(x)       (S(x, 1) ^ S(x, 8) ^ R(x, 7))
+#define Gamma1(x)       (S(x, 19) ^ S(x, 61) ^ R(x, 6))
+#ifndef MIN
+   #define MIN(x, y) ( ((x)<(y))?(x):(y) )
+#endif
 
 /* compress 512-bits */
 #ifdef LTC_CLEAN_STACK
@@ -591,7 +642,7 @@ static int sha256_compress(hash_state * md, const unsigned char *buf)
 
     /* fill W[16..63] */
     for (i = 16; i < 64; i++) {
-        W[i] = Gamma1(W[i - 2]) + W[i - 7] + Gamma0(W[i - 15]) + W[i - 16];
+        W[i] += Gamma1(W[i - 2]) + W[i - 7] + Gamma0(W[i - 15]) + W[i - 16];
     }
 
     /* Compress */
@@ -839,37 +890,6 @@ where l = 2^252 + 27742317777372353535851937790883648493.
 void sc_reduce(unsigned char *s);
 void sc_muladd(unsigned char *s, const unsigned char *a, const unsigned char *b, const unsigned char *c);
 
-
-void ed25519_sign(unsigned char *signature,
-                  const unsigned char *message,
-                  size_t message_len,
-                  const unsigned char *public_key,
-                  const unsigned char *private_key) {
-    sha512_context hash;
-    unsigned char hram[64];
-    unsigned char r[64];
-    ge_p3 R;
-
-
-    sha512_init(&hash);
-    sha512_update(&hash, private_key + 32, 32);
-    sha512_update(&hash, message, message_len);
-    sha512_final(&hash, r);
-
-    sc_reduce(r);
-    ge_scalarmult_base(&R, r);
-    ge_p3_tobytes(signature, &R);
-
-    sha512_init(&hash);
-    sha512_update(&hash, signature, 32);
-    sha512_update(&hash, public_key, 32);
-    sha512_update(&hash, message, message_len);
-    sha512_final(&hash, hram);
-
-    sc_reduce(hram);
-    sc_muladd(signature + 32, hram, private_key, r);
-}
-
 /* LibTomCrypt, modular cryptographic library -- Tom St Denis
  *
  * LibTomCrypt is a library that provides various cryptographic
@@ -926,28 +946,12 @@ __constant uint64_t K[80] = {
 
 /* Various logical functions */
 
-#define ROR64c(x, y) \
-    ( ((((x)&UINT64_C(0xFFFFFFFFFFFFFFFF))>>((uint64_t)(y)&UINT64_C(63))) | \
-      ((x)<<((uint64_t)(64-((y)&UINT64_C(63)))))) & UINT64_C(0xFFFFFFFFFFFFFFFF))
-
-#define STORE64H(x, y)                                                                     \
-   { (y)[0] = (unsigned char)(((x)>>56)&255); (y)[1] = (unsigned char)(((x)>>48)&255);     \
-     (y)[2] = (unsigned char)(((x)>>40)&255); (y)[3] = (unsigned char)(((x)>>32)&255);     \
-     (y)[4] = (unsigned char)(((x)>>24)&255); (y)[5] = (unsigned char)(((x)>>16)&255);     \
-     (y)[6] = (unsigned char)(((x)>>8)&255); (y)[7] = (unsigned char)((x)&255); }
-
-#define LOAD64H(x, y)                                                      \
-   { x = (((uint64_t)((y)[0] & 255))<<56)|(((uint64_t)((y)[1] & 255))<<48) | \
-         (((uint64_t)((y)[2] & 255))<<40)|(((uint64_t)((y)[3] & 255))<<32) | \
-         (((uint64_t)((y)[4] & 255))<<24)|(((uint64_t)((y)[5] & 255))<<16) | \
-         (((uint64_t)((y)[6] & 255))<<8)|(((uint64_t)((y)[7] & 255))); }
-
 #ifndef MIN
    #define MIN(x, y) ( ((x)<(y))?(x):(y) )
 #endif
 
 /* compress 1024-bits */
-static int sha512_compress(sha512_context *md, unsigned char *buf)
+static int sha512_compress_public(sha512_context *md, __global unsigned char *buf)
 {
     uint64_t S[8], W[80], t0, t1;
     int i;
@@ -997,6 +1001,55 @@ static int sha512_compress(sha512_context *md, unsigned char *buf)
     return 0;
 }
 
+/* compress 1024-bits */
+static int sha512_compress(sha512_context *md, unsigned char *buf)
+{
+    uint64_t S[8], W[80], t0, t1;
+    int i;
+	
+    /* copy state into S */
+    for (i = 0; i < 8; i++) {
+        S[i] = md->state[i];
+    }
+
+    /* copy the state into 1024-bits into W[0..15] */
+    for (i = 0; i < 16; i++) {
+        LOAD64H(W[i], buf + (8*i));
+    }
+
+    /* fill W[16..79] */
+    for (i = 16; i < 80; i++) {
+        W[i] = Gamma1(W[i - 2]) + W[i - 7] + Gamma0(W[i - 15]) + W[i - 16];
+    }
+
+    /* Compress */
+    #define RND(a,b,c,d,e,f,g,h,i) \
+    t0 = h + Sigma1(e) + Ch(e, f, g) + K[i] + W[i]; \
+    t1 = Sigma0(a) + Maj(a, b, c);\
+    d += t0; \
+    h  = t0 + t1;
+
+    for (i = 0; i < 80; i += 8) {
+       RND(S[0],S[1],S[2],S[3],S[4],S[5],S[6],S[7],i+0);
+       RND(S[7],S[0],S[1],S[2],S[3],S[4],S[5],S[6],i+1);
+       RND(S[6],S[7],S[0],S[1],S[2],S[3],S[4],S[5],i+2);
+       RND(S[5],S[6],S[7],S[0],S[1],S[2],S[3],S[4],i+3);
+       RND(S[4],S[5],S[6],S[7],S[0],S[1],S[2],S[3],i+4);
+       RND(S[3],S[4],S[5],S[6],S[7],S[0],S[1],S[2],i+5);
+       RND(S[2],S[3],S[4],S[5],S[6],S[7],S[0],S[1],i+6);
+       RND(S[1],S[2],S[3],S[4],S[5],S[6],S[7],S[0],i+7);
+   }
+
+   #undef RND
+
+    /* feedback */
+    for (i = 0; i < 8; i++) {
+        md->state[i] = md->state[i] + S[i];
+    }
+
+    return 0;
+}
+
 
 /**
    Initialize the hash state
@@ -1027,7 +1080,7 @@ int sha512_init(sha512_context * md) {
    @param inlen  The length of the data (octets)
    @return 0 if successful
 */
-int sha512_update(sha512_context * md, const unsigned char *in, size_t inlen)
+int sha512_update(sha512_context * md, __global const unsigned char *in, size_t inlen)
 {
     size_t n;
     size_t i;
@@ -1039,7 +1092,7 @@ int sha512_update(sha512_context * md, const unsigned char *in, size_t inlen)
     }
     while (inlen > 0) {
         if (md->curlen == 0 && inlen >= 128) {
-           if ((err = sha512_compress (md, (unsigned char *)in)) != 0) {
+           if ((err = sha512_compress_public (md, (__global unsigned char *)in)) != 0) {
               return err;
            }
            md->length += 128 * 8;
@@ -1123,13 +1176,62 @@ int sha512_final(sha512_context * md, unsigned char *out)
     return 0;
 }
 
-int sha512(const unsigned char *message, size_t message_len, unsigned char *out)
+int sha512_final_public(sha512_context * md, __global unsigned char *out)
+{
+    int i;
+
+    if (md == NULL) return 1;
+    if (out == NULL) return 1;
+
+    if (md->curlen >= sizeof(md->buf)) {
+        return 1;
+    }
+
+    /* increase the length of the message */
+    md->length += md->curlen * UINT64_C(8);
+
+    /* append the '1' bit */
+    md->buf[md->curlen++] = (unsigned char)0x80;
+
+    /* if the length is currently above 112 bytes we append zeros
+     * then compress.  Then we can fall back to padding zeros and length
+     * encoding like normal.
+     */
+    if (md->curlen > 112) {
+        while (md->curlen < 128) {
+            md->buf[md->curlen++] = (unsigned char)0;
+        }
+        sha512_compress(md, md->buf);
+        md->curlen = 0;
+    }
+
+    /* pad upto 120 bytes of zeroes
+     * note: that from 112 to 120 is the 64 MSB of the length.  We assume that you won't hash
+     * > 2^64 bits of data... :-)
+     */
+    while (md->curlen < 120) {
+        md->buf[md->curlen++] = (unsigned char)0;
+    }
+
+    /* store length */
+    STORE64H(md->length, md->buf+120);
+    sha512_compress(md, md->buf);
+
+    /* copy output */
+    for (i = 0; i < 8; i++) {
+        STORE64H(md->state[i], out+(8*i));
+    }
+
+    return 0;
+}
+
+int sha512(__global const unsigned char *message, size_t message_len, __global unsigned char *out)
 {
     sha512_context ctx;
     int ret;
     if ((ret = sha512_init(&ctx))) return ret;
     if ((ret = sha512_update(&ctx, message, message_len))) return ret;
-    if ((ret = sha512_final(&ctx, out))) return ret;
+    if ((ret = sha512_final_public(&ctx, out))) return ret;
     return 0;
 }
 
@@ -1190,23 +1292,11 @@ bool ED25519_DECLSPEC ed25519_init();
 
 #define ROUND_UP_DIV(x, y) (((x) + (y) - 1) / (y))
 
-#ifndef UINT64_C
-#define UINT64_C uint64_t
-#endif
+//#ifndef UINT64_C
+//#define UINT64_C uint64_t
+//#endif
 
 #define USE_CLOCK_GETTIME
-
-void ed25519_create_keypair(unsigned char *public_key, unsigned char *private_key, const unsigned char *seed) {
-    ge_p3 A;
-
-    sha512(seed, 32, private_key);
-    private_key[0] &= 248;
-    private_key[31] &= 63;
-    private_key[31] |= 64;
-
-    ge_scalarmult_base(&A, private_key);
-    ge_p3_tobytes(public_key, &A);
-}
 
 static uint64_t load_3(const unsigned char *in) {
     uint64_t result;
@@ -2083,11 +2173,6 @@ void ge_double_scalarmult_vartime(ge_p2 *r, const unsigned char *a, const ge_p3 
     signed char aslide[256];
     signed char bslide[256];
 	
-	ge_precomp Bi_priv[8];
-	for(int i = 0; i < 8; i++) {
-			Bi_priv[i] = Bi[i];
-	}
-	
     ge_cached Ai[8]; /* A,3A,5A,7A,9A,11A,13A,15A */
     ge_p1p1 t;
     ge_p3 u;
@@ -2140,12 +2225,14 @@ void ge_double_scalarmult_vartime(ge_p2 *r, const unsigned char *a, const ge_p3 
 
         if (bslide[i] > 0) {
             ge_p1p1_to_p3(&u, &t);
-			// TODO fixme OpenCL constant=>global
-            ge_madd(&t, &u, &Bi_priv[bslide[i] / 2]);
+			// TODO check fixed OpenCL constant=>priv
+			ge_precomp Bi_priv = Bi[bslide[i] / 2];
+            ge_madd(&t, &u, &Bi_priv);
         } else if (bslide[i] < 0) {
             ge_p1p1_to_p3(&u, &t);
-			// TODO fixme OpenCL constant=>global
-            ge_msub(&t, &u, &Bi_priv[(-bslide[i]) / 2]);
+			// TODO check fixed OpenCL constant=>priv
+			ge_precomp Bi_priv = Bi[(-bslide[i]) / 2];
+            ge_msub(&t, &u, &Bi_priv);
         }
 
         ge_p1p1_to_p2(r, &t);
@@ -2333,8 +2420,13 @@ void ge_p3_to_cached(ge_cached *r, const ge_p3 *p) {
     fe_add(r->YplusX, p->Y, p->X);
     fe_sub(r->YminusX, p->Y, p->X);
     fe_copy(r->Z, p->Z);
-    // FIXME OpenCL generic to constant
-	//fe_mul(r->T2d, p->T, d2);
+    // check fix OpenCL
+	fe d2_priv;
+	for(int i=0; i<10; i++) {
+		d2_priv[i] = d2[i];
+	}
+	
+	fe_mul(r->T2d, p->T, d2_priv);
 }
 
 
@@ -2392,13 +2484,9 @@ static void select_func(const ge_precomp *t, int pos, signed char b) {
     fe_1(t->yminusx);
     fe_0(t->xy2d);
 	
-	// OpenCL fixme, constant => global
-	ge_precomp base_priv[8];
-	for(int i = 0; i < 8; i++) {
-		base_priv[i] = base[pos][i];
-	}
-	
-    cmov(t, &base_priv[0], equal(babs, 1));
+	/*
+	//  OpenCL check fix
+	cmov(t, &base_priv[1], equal(babs, 2));
     cmov(t, &base_priv[1], equal(babs, 2));
     cmov(t, &base_priv[2], equal(babs, 3));
     cmov(t, &base_priv[3], equal(babs, 4));
@@ -2406,6 +2494,14 @@ static void select_func(const ge_precomp *t, int pos, signed char b) {
     cmov(t, &base_priv[5], equal(babs, 6));
     cmov(t, &base_priv[6], equal(babs, 7));
     cmov(t, &base_priv[7], equal(babs, 8));
+	*/
+	
+	ge_precomp base_priv;
+	for(int i = 0; i < 8; i++) {
+		base_priv = base[pos][i];
+		cmov(t, &base_priv, equal(babs, i + 1));
+	}
+	
     fe_copy(minust.yplusx, t->yminusx);
     fe_copy(minust.yminusx, t->yplusx);
     fe_neg(minust.xy2d, t->xy2d);
@@ -4026,27 +4122,34 @@ ed25519_verify_device(__global const unsigned char *signature,
     if (signature[63] & 224) {
         return 0;
     }
+	
+	unsigned char public_key_priv[32];
+	for(int i=0; i<32; i++) {
+		public_key_priv[i] = public_key[i];
+	}
 
-	// OpenCL fixme, address space private => global
-	/*
-    if (ge_frombytes_negate_vartime(&A, public_key) != 0) {
+    if (ge_frombytes_negate_vartime(&A, public_key_priv) != 0) {
         return 0;
     }
-
+	
     sha512_init(&hash);
     sha512_update(&hash, signature, 32);
     sha512_update(&hash, public_key, 32);
     sha512_update(&hash, message, message_len);
     sha512_final(&hash, h);
+	
+	unsigned char signature_priv[64];
+	for(int i=0; i<64; i++) {
+		signature_priv[i] = signature[i];
+	}
     
     sc_reduce(h);
-    ge_double_scalarmult_vartime(&R, h, &A, signature + 32);
+    ge_double_scalarmult_vartime(&R, h, &A, signature_priv + 32);
     ge_tobytes(checker, &R);
 
-    if (!consttime_equal(checker, signature)) {
-        return 0;
+    if (!consttime_equal(checker, signature_priv)) {
+		return 0;
     }
-	*/
 
     return 1;
 }

@@ -13,18 +13,12 @@
 #include "modes.h"
 #include "perftime.h"
 #include "modes_lcl.h"
-#include "gpu_common.h"
+#include "aes_core.cpp"
+#include "cl_common.h"
 
 #if !defined(STRICT_ALIGNMENT) && !defined(PEDANTIC)
 # define STRICT_ALIGNMENT 0
 #endif
-
-int AES_set_encrypt_key(const unsigned char *userKey, const int bits,
-                        AES_KEY *key) 
-{
-	// TODO
-	return 0;
-}
 
 void AES_cbc_encrypt(
 		const unsigned char *in, 
@@ -38,10 +32,6 @@ void AES_cbc_encrypt(
     
     cl_int ret;
 
-    if (length < BLOCK_SIZE) {
-        printf("ERROR! block size(%d) > length(%zu)\n", BLOCK_SIZE, length);
-        return;
-    }
     cl_mem in_device;
     cl_mem output_device;
     cl_mem keys_device;
@@ -125,14 +115,15 @@ void AES_cbc_encrypt_many(const unsigned char *in, unsigned char *out,
                           uint32_t num_keys,
                           float* time_us)
 {
-    DIE(cl_check_init() == false, "OpenCL could not be init");
-    
-    cl_int ret;
-
     if (length < BLOCK_SIZE) {
         printf("ERROR! block size(%d) > length(%zu)\n", BLOCK_SIZE, length);
         return;
     }
+
+    DIE(cl_check_init() == false, "OpenCL could not be init");
+    
+    cl_int ret;
+
     cl_mem in_device;
     cl_mem keys_device;
     cl_mem output_device;

@@ -1,7 +1,5 @@
 const char *kernels_chacha_cbc_src = R""""(
 
-#define ENDIAN_NEUTRAL 		1
-
 #define uint64_t	ulong
 #define uint32_t	uint
 #define uint16_t	ushort
@@ -27,12 +25,15 @@ const char *kernels_chacha_cbc_src = R""""(
  * https://www.openssl.org/source/license.html
  */
 
+/*
+// pointers to functions not allowed AMD ROCm
 #ifndef HEADER_MODES_H
 # define HEADER_MODES_H
 
 # ifdef  __cplusplus
 extern "C" {
 # endif
+
 typedef void (*block128_f) (const unsigned char in[16],
                             unsigned char out[16], const void *key);
 
@@ -118,6 +119,7 @@ size_t CRYPTO_nistcts128_decrypt_block(const unsigned char *in,
 size_t CRYPTO_nistcts128_decrypt(const unsigned char *in, unsigned char *out,
                                  size_t len, const void *key,
                                  unsigned char ivec[16], cbc128_f cbc);
+
 
 typedef struct gcm128_context GCM128_CONTEXT;
 
@@ -218,14 +220,16 @@ int CRYPTO_ocb128_finish(OCB128_CONTEXT *ctx, const unsigned char *tag,
                          size_t len);
 int CRYPTO_ocb128_tag(OCB128_CONTEXT *ctx, unsigned char *tag, size_t len);
 void CRYPTO_ocb128_cleanup(OCB128_CONTEXT *ctx);
-# endif                          /* OPENSSL_NO_OCB */
+# endif                          // OPENSSL_NO_OCB
 
 # ifdef  __cplusplus
 }
 # endif
 
 #endif
+*/
 
+#define OPENSSL_NO_OCB 1
 
 /*
  * Copyright 2010-2018 The OpenSSL Project Authors. All Rights Reserved.
@@ -358,12 +362,12 @@ struct gcm128_context {
     u128 Htable[256];
 #else
     u128 Htable[16];
-    void (*gmult) (u64 Xi[2], const u128 Htable[16]);
-    void (*ghash) (u64 Xi[2], const u128 Htable[16], const u8 *inp,
-                   size_t len);
+//    void (*gmult) (u64 Xi[2], const u128 Htable[16]);
+//    void (*ghash) (u64 Xi[2], const u128 Htable[16], const u8 *inp,
+//                   size_t len);
 #endif
     unsigned int mres, ares;
-    block128_f block;
+    //block128_f block;
     void *key;
 #if !defined(OPENSSL_SMALL_FOOTPRINT)
     unsigned char Xn[48];
@@ -372,7 +376,7 @@ struct gcm128_context {
 
 struct xts128_context {
     void *key1, *key2;
-    block128_f block1, block2;
+    //block128_f block1, block2;
 };
 
 struct ccm128_context {
@@ -381,7 +385,7 @@ struct ccm128_context {
         u8 c[16];
     } nonce, cmac;
     u64 blocks;
-    block128_f block;
+    //block128_f block;
     void *key;
 };
 
@@ -739,7 +743,6 @@ void cuda_chacha20_cbc128_encrypt(__global const unsigned char* in, __global uns
         out += CHACHA_BLOCK_SIZE;
     }
 	
-    //memcpy(ivec, iv, CHACHA_BLOCK_SIZE);
 	for(int i = 0; i < CHACHA_BLOCK_SIZE; i++) {
 		ivec[i] = iv[i];
 	}
@@ -1242,48 +1245,6 @@ static inline ulong64 ROR64(ulong64 word, int i)
 
 #define XMEMCPY memcpy
 
-/* a simple macro for making hash "process" functions */
-#define HASH_PROCESS(func_name, compress_name, state_var, block_size)                       \
-int func_name (hash_state * md, const unsigned char *in, unsigned long inlen)               \
-{                                                                                           \
-    unsigned long n;                                                                        \
-    int           err;                                                                      \
-    //LTC_ARGCHK(md != NULL);                                                                 \
-    //LTC_ARGCHK(in != NULL);                                                                 \
-    if (md-> state_var .curlen > sizeof(md-> state_var .buf)) {                             \
-       return CRYPT_INVALID_ARG;                                                            \
-    }                                                                                       \
-    if ((md-> state_var .length + inlen) < md-> state_var .length) {                        \
-      return CRYPT_HASH_OVERFLOW;                                                           \
-    }                                                                                       \
-    while (inlen > 0) {                                                                     \
-        if (md-> state_var .curlen == 0 && inlen >= block_size) {                           \
-           if ((err = compress_name (md, in)) != CRYPT_OK) {                                \
-              return err;                                                                   \
-           }                                                                                \
-           md-> state_var .length += block_size * 8;                                        \
-           in             += block_size;                                                    \
-           inlen          -= block_size;                                                    \
-        } else {                                                                            \
-           n = MIN(inlen, (block_size - md-> state_var .curlen));                           \
-           XMEMCPY(md-> state_var .buf + md-> state_var.curlen, in, (size_t)n);             \
-           md-> state_var .curlen += n;                                                     \
-           in             += n;                                                             \
-           inlen          -= n;                                                             \
-           if (md-> state_var .curlen == block_size) {                                      \
-              if ((err = compress_name (md, md-> state_var .buf)) != CRYPT_OK) {            \
-                 return err;                                                                \
-              }                                                                             \
-              md-> state_var .length += 8*block_size;                                       \
-              md-> state_var .curlen = 0;                                                   \
-           }                                                                                \
-       }                                                                                    \
-    }                                                                                       \
-    return CRYPT_OK;                                                                        \
-}
-
-
-
 /* ref:         $Format:%D$ */
 /* git commit:  $Format:%H$ */
 /* commit time: $Format:%ai$ */
@@ -1540,12 +1501,58 @@ inline int  sha256_done(__global hash_state * md, __global unsigned char *out)
     return CRYPT_OK;
 }
 
+static int sha256_process (
+			__global hash_state * md, 
+			__global const unsigned char *in, 
+			unsigned long inlen)
+{
+    unsigned long n;
+    int           err;
+    if (md-> sha256.curlen > sizeof(md->sha256.buf)) {
+       return CRYPT_INVALID_ARG;
+    }
+    if ((md-> sha256.length + inlen) < md-> sha256.length) {
+      return CRYPT_HASH_OVERFLOW;
+    }
+    while (inlen > 0) {
+        if (md-> sha256.curlen == 0 && inlen >= 64) {
+           if ((err = sha256_compress (md, in)) != CRYPT_OK) {
+              return err;
+           }
+           md-> sha256 .length += 64 * 8;
+           in             += 64;
+           inlen          -= 64;
+        } else {
+           n = MIN(inlen, (64 - md-> sha256.curlen));
+           
+		   // XMEMCPY(md->sha256.buf + md->sha256.curlen, in, (size_t)n);
+		   __global unsigned char *buf = md->sha256.buf + md->sha256.curlen;
+		   for(int i = 0; i < n; i++) {
+				buf[i] = in[i];
+		   }
+		   
+           md-> sha256.curlen += n;
+           in             += n;
+           inlen          -= n;
+           if (md-> sha256.curlen == 64) {
+              if ((err = sha256_compress (md, md-> sha256.buf)) != CRYPT_OK) {
+                 return err;
+              }
+              md-> sha256.length += 8 * 64;
+              md-> sha256.curlen = 0;
+           }
+       }
+    }
+    return CRYPT_OK;
+}
+
+
 /**
   Self-test the hash
   @return CRYPT_OK if successful, CRYPT_NOP if self-tests have been disabled
 */
 #if 0
-int  sha256_test(void)
+int sha256_test(void)
 {
  #ifndef LTC_TEST
     return CRYPT_NOP;
@@ -1574,9 +1581,7 @@ int  sha256_test(void)
 
   for (i = 0; i < (int)(sizeof(tests) / sizeof(tests[0])); i++) {
       sha256_init(&md);
-	  // TODO OpenCL fix
-      //sha256_process(&md, (unsigned char*)tests[i].msg, (unsigned long)strlen(tests[i].msg));
-	  sha256_compress(&md, (unsigned char*)tests[i].msg);
+      sha256_process(&md, (unsigned char*)tests[i].msg, (unsigned long)strlen(tests[i].msg));
       sha256_done(&md, tmp);
       if (compare_testvector(tmp, sizeof(tmp), tests[i].hash, sizeof(tests[i].hash), "SHA256", i)) {
          return CRYPT_FAIL_TESTVECTOR;
@@ -1624,15 +1629,13 @@ __kernel void chacha20_cbc128_encrypt_sample_kernel(__global const uint8_t* inpu
 
     if (i < num_keys) {
 		// TODO OpenCL check
-        //uint8_t* t_output = &output[i * BLOCK_SIZE];
+        __global uint8_t* t_output = &output[i * BLOCK_SIZE];
         cuda_chacha20_cbc128_encrypt(input, &output[i * BLOCK_SIZE], length, &keys[i * CHACHA_KEY_SIZE], &ivec[i * CHACHA_BLOCK_SIZE]);
 
         for (uint32_t j = 0; j < sample_len; j++) {
             uint64_t cur_sample = sample_idx[j] * SAMPLE_SIZE;
             if (cur_sample >= block_offset && cur_sample < (block_offset + length)) {
-                // TOOD OpenCL fix
-				//sha256_process(&sha_state[i], &output[i * BLOCK_SIZE + cur_sample - block_offset], SAMPLE_SIZE);
-				sha256_compress(&sha_state[i], &output[i * BLOCK_SIZE + cur_sample - block_offset]);
+				sha256_process(&sha_state[i], &t_output[cur_sample - block_offset], SAMPLE_SIZE);
             }
         }
     }

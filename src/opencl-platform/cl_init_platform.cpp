@@ -6,8 +6,9 @@
 #include <string>
 #include <fstream>
 
-#include "gpu_common.h"
+#include "cl_common.h"
 
+cl_uint query_device_type = CL_DEVICE_TYPE_ALL;
 bool cl_is_init = false;
 
 cl_context context;
@@ -168,15 +169,58 @@ void cl_get_compiler_err_log(cl_program program, cl_device_id device)
     cout << endl << build_log << endl;
 }
 
+/**
+* Check OpenCL init with device selection
+*/
+string cl_get_device_type_setup() {
+	
+	switch(query_device_type) {
+		case CL_DEVICE_TYPE_CPU:
+			return "CPU";
+		break;
+		
+		case CL_DEVICE_TYPE_GPU:
+			return "GPU";
+		break;
+		
+		case CL_DEVICE_TYPE_ACCELERATOR:
+			return "ACCELERATOR";
+		break;
+		
+		case CL_DEVICE_TYPE_ALL:
+			return "ALL";
+		break;
+		
+		default:
+			return "ERROR invalid";
+	}
+}
 
 /**
-* Retrieve GPU device
+* Check OpenCL init with device selection
+*/
+bool cl_check_init(cl_uint sel_device_type) {
+	
+	if(query_device_type != sel_device_type) {
+		// if device type changed, invalidate init
+		cl_is_init = false;
+		query_device_type = sel_device_type;
+	}
+
+    return cl_check_init();
+}
+
+/**
+* Check OpenCL init
 */
 bool cl_check_init(void) {
 
     if(cl_is_init == true) {
         return true;
-    }
+    } else {
+		cout << "OpenCL platform query & init..." << endl;
+		cout << "OpenCL init devices query type: " << cl_get_device_type_setup() << endl;
+	}
 
     int ret;
 
@@ -231,7 +275,7 @@ bool cl_check_init(void) {
 
         /* get num of available OpenCL devices type ALL on the selected platform */
         if(clGetDeviceIDs(platform_list[platf], 
-            CL_DEVICE_TYPE_GPU, 0, NULL, &device_num) != CL_SUCCESS) {
+            query_device_type, 0, NULL, &device_num) != CL_SUCCESS) {
             device_num = 0;
             continue;
         }
@@ -240,7 +284,7 @@ bool cl_check_init(void) {
         DIE(device_list == NULL, "alloc devices");
 
         /* get all available OpenCL devices type ALL on the selected platform */
-        CL_ERR( clGetDeviceIDs(platform_list[platf], CL_DEVICE_TYPE_GPU,
+        CL_ERR( clGetDeviceIDs(platform_list[platf], query_device_type,
             device_num, device_list, NULL));
         cout << "\tDevices found " << device_num  << endl;
 
@@ -303,7 +347,7 @@ bool cl_check_init(void) {
     CL_ERR( ret );
 
     /* compile the program for the given set of devices */
-    ret = clBuildProgram(program, 1, &device, "", NULL, NULL);
+    ret = clBuildProgram(program, 1, &device, "-DENDIAN_NEUTRAL -DLTC_NO_ASM", NULL, NULL);
     CL_COMPILE_ERR( ret, program, device );
 
     /* create kernel associated to compiled source kernel */
@@ -332,7 +376,7 @@ bool cl_check_init(void) {
     CL_ERR( ret );
 
     /* compile the program for the given set of devices */
-    ret = clBuildProgram(program, 1, &device, "", NULL, NULL);
+    ret = clBuildProgram(program, 1, &device, "-DENDIAN_NEUTRAL -DLTC_NO_ASM", NULL, NULL);
     CL_COMPILE_ERR( ret, program, device );
 	
 	chacha20_ctr_encrypt_kernel = clCreateKernel(program, "chacha20_ctr_encrypt_kernel", &ret);
@@ -373,7 +417,7 @@ bool cl_check_init(void) {
     CL_ERR( ret );
 
     /* compile the program for the given set of devices */
-    ret = clBuildProgram(program, 1, &device, "", NULL, NULL);
+    ret = clBuildProgram(program, 1, &device, "-DENDIAN_NEUTRAL -DLTC_NO_ASM", NULL, NULL);
     CL_COMPILE_ERR( ret, program, device );
 	
 	ed25519_verify_kernel = clCreateKernel(program, "ed25519_verify_kernel", &ret);

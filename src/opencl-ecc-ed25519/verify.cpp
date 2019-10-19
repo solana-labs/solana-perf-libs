@@ -12,7 +12,7 @@
 #include "ed25519.h"
 #include <pthread.h>
 
-#include "gpu_common.h"
+#include "cl_common.h"
 
 #define USE_CLOCK_GETTIME
 #include "perftime.h"
@@ -75,7 +75,6 @@ static int ed25519_verify_device(const unsigned char *signature,
     if (ge_frombytes_negate_vartime(&A, public_key) != 0) {
         return 0;
     }
-
     sha512_init(&hash);
     sha512_update(&hash, signature, 32);
     sha512_update(&hash, public_key, 32);
@@ -118,8 +117,8 @@ typedef struct {
 
 static pthread_mutex_t g_ctx_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-#define MAX_NUM_GPUS 8
-#define MAX_QUEUE_SIZE 8
+#define MAX_NUM_GPUS 1
+#define MAX_QUEUE_SIZE 1
 
 static gpu_ctx g_gpu_ctx[MAX_NUM_GPUS][MAX_QUEUE_SIZE] = {0};
 static uint32_t g_cur_gpu = 0;
@@ -132,14 +131,10 @@ void ed25519_set_verbose(bool val) {
 }
 
 static bool ed25519_init_locked() {
-	
-	/*
     if (g_total_gpus == -1) {
-        cudaGetDeviceCount(&g_total_gpus);
-        g_total_gpus = min(MAX_NUM_GPUS, g_total_gpus);
+        g_total_gpus = MAX_NUM_GPUS;
         LOG("total_gpus: %d\n", g_total_gpus);
         for (int gpu = 0; gpu < g_total_gpus; gpu++) {
-            CUDA_CHK(cudaSetDevice(gpu));
             for (int queue = 0; queue < MAX_QUEUE_SIZE; queue++) {
                 int err = pthread_mutex_init(&g_gpu_ctx[gpu][queue].mutex, NULL);
                 if (err != 0) {
@@ -148,13 +143,9 @@ static bool ed25519_init_locked() {
                     g_total_gpus = 0;
                     return false;
                 }
-                CUDA_CHK(cudaStreamCreate(&g_gpu_ctx[gpu][queue].stream));
             }
         }
-    } */
-	
-	// TODO hardcoded OpenCL current support
-	g_total_gpus = 1;
+    }
 	
     return g_total_gpus > 0;
 }
@@ -218,13 +209,10 @@ void ed25519_verify_many(const gpu_Elems* elems,
     gpu_ctx* cur_ctx = &g_gpu_ctx[cur_gpu][cur_queue];
     pthread_mutex_lock(&cur_ctx->mutex);
 
-    //CUDA_CHK(cudaSetDevice(cur_gpu));
-
     LOG("cur gpu: %d cur queue: %d\n", cur_gpu, cur_queue);
 
     if (total_packets_len > cur_ctx->total_packets_len) {
-		// TODO OpenCL fix memory leak
-		//CL_ERR(clReleaseMemObject(cur_ctx->packets));
+		clReleaseMemObject(cur_ctx->packets);
 		cur_ctx->packets = clCreateBuffer(context, CL_MEM_READ_WRITE, total_packets_len, NULL, &ret);
 		CL_ERR( ret );
 
@@ -232,8 +220,7 @@ void ed25519_verify_many(const gpu_Elems* elems,
     }
 
     if (cur_ctx->num < total_signatures) {
-		// TODO OpenCL fix memory leak
-		//CL_ERR(clReleaseMemObject(cur_ctx->out));
+		clReleaseMemObject(cur_ctx->out);
 		cur_ctx->out = clCreateBuffer(context, CL_MEM_READ_WRITE, out_size, NULL, &ret);
 		CL_ERR( ret );
 
@@ -241,30 +228,28 @@ void ed25519_verify_many(const gpu_Elems* elems,
     }
 
     if (cur_ctx->num_signatures < total_signatures) {
-		// TODO OpenCL fix memory leaks
-		//CL_ERR(clReleaseMemObject(cur_ctx->public_key_offsets));
+		
+		clReleaseMemObject(cur_ctx->public_key_offsets);
 		cur_ctx->public_key_offsets = clCreateBuffer(context, CL_MEM_READ_WRITE, offsets_size, NULL, &ret);
 		CL_ERR( ret );
 		
-		//CL_ERR(clReleaseMemObject(cur_ctx->signature_offsets));
+		clReleaseMemObject(cur_ctx->signature_offsets);
 		cur_ctx->signature_offsets = clCreateBuffer(context, CL_MEM_READ_WRITE, offsets_size, NULL, &ret);
 		CL_ERR( ret );
 		
-		//CL_ERR(clReleaseMemObject(cur_ctx->message_start_offsets));
+		clReleaseMemObject(cur_ctx->message_start_offsets);
 		cur_ctx->message_start_offsets = clCreateBuffer(context, CL_MEM_READ_WRITE, offsets_size, NULL, &ret);
 		CL_ERR( ret );
 		
-		//CL_ERR(clReleaseMemObject(cur_ctx->message_lens));
+		clReleaseMemObject(cur_ctx->message_lens);
 		cur_ctx->message_lens = clCreateBuffer(context, CL_MEM_READ_WRITE, offsets_size, NULL, &ret);
 		CL_ERR( ret );
 
         cur_ctx->num_signatures = total_signatures;
     }
-
-    //cudaStream_t stream = 0;
-    //if (0 != use_non_default_stream) {
-    //    stream = cur_ctx->stream;
-    //}
+	
+	perftime_t start, end;
+    get_time(&start);
 	
 	CL_ERR( clEnqueueWriteBuffer(cmd_queue, cur_ctx->public_key_offsets, CL_TRUE, 0, offsets_size, public_key_offsets, 0, NULL, NULL));
 	CL_ERR( clEnqueueWriteBuffer(cmd_queue, cur_ctx->signature_offsets, CL_TRUE, 0, offsets_size, signature_offsets, 0, NULL, NULL));
@@ -274,17 +259,14 @@ void ed25519_verify_many(const gpu_Elems* elems,
     size_t cur = 0;
     for (size_t i = 0; i < num_elems; i++) {
         LOG("i: %zu size: %d\n", i, elems[i].num * message_size);
-        CL_ERR( clEnqueueReadBuffer(cmd_queue, cur_ctx->packets, CL_TRUE, cur * message_size, elems[i].num * message_size, elems[i].elems, 0, NULL, NULL));
+        CL_ERR( clEnqueueWriteBuffer(cmd_queue, cur_ctx->packets, CL_TRUE, cur * message_size, elems[i].num * message_size, elems[i].elems, 0, NULL, NULL));
 		cur += elems[i].num;
     }
 
     size_t num_threads_per_block = 64;
     size_t num_blocks = ROUND_UP_DIV(total_signatures, num_threads_per_block) * num_threads_per_block;
     LOG("num_blocks: %d threads_per_block: %d keys: %d out: %p\n",
-           num_blocks, num_threads_per_block, (int)total_packets, out);
-
-    perftime_t start, end;
-    get_time(&start);							 
+           num_blocks, num_threads_per_block, (int)total_packets, out);					 
 							 
 	CL_ERR( clSetKernelArg(ed25519_verify_kernel, 0, sizeof(cl_mem), (void *)&cur_ctx->packets) );
 	CL_ERR( clSetKernelArg(ed25519_verify_kernel, 1, sizeof(cl_uint), (void *)&message_size) );
@@ -295,26 +277,18 @@ void ed25519_verify_many(const gpu_Elems* elems,
 	CL_ERR( clSetKernelArg(ed25519_verify_kernel, 6, sizeof(cl_uint), (void *)&cur_ctx->num_signatures) );
 	CL_ERR( clSetKernelArg(ed25519_verify_kernel, 7, sizeof(cl_mem), (void *)&cur_ctx->out) );
 
-	size_t globalSize[2] = {num_blocks, 0};
+	size_t globalSize[2] = {num_blocks * num_threads_per_block, 0};
 	size_t localSize[2] = {num_threads_per_block, 0};	
+	
 	ret = clEnqueueNDRangeKernel(cmd_queue, ed25519_verify_kernel, 1, NULL,
 		globalSize, localSize, 0, NULL, NULL);
 		CL_ERR( ret );
-    //CUDA_CHK(cudaPeekAtLastError());
-
-	CL_ERR( clEnqueueReadBuffer(cmd_queue, cur_ctx->out, CL_TRUE, 0, out_size, out, 0, NULL, NULL));
 		
-	//if (err != cudaSuccess)  {
-    //    fprintf(stderr, "cudaMemcpy(out) error: out = %p cur_ctx->out = %p size = %zu num: %d elems = %p\n",
-    //                    out, cur_ctx->out, out_size, num_elems, elems);
-    //}
-    //CUDA_CHK(err);
-
-    //CUDA_CHK(cudaStreamSynchronize(stream));
+	CL_ERR( clEnqueueReadBuffer(cmd_queue, cur_ctx->out, CL_TRUE, 0, out_size, out, 0, NULL, NULL));
 
     pthread_mutex_unlock(&cur_ctx->mutex);
 
-    get_time(&end);
+	get_time(&end);
     LOG("time diff: %f\n", get_diff(&start, &end));
 }
 

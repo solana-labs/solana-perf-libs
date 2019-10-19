@@ -2,37 +2,36 @@
 #include <string.h>
 #include <inttypes.h>
 #include <pthread.h>
-#include "gpu_common.h"
+#include "cl_common.h"
 #include "sha256.cu"
 
-#define MAX_NUM_GPUS 8
-#define MAX_QUEUE_SIZE 8
-#define NUM_THREADS_PER_BLOCK 64
+// TODO OpenCL uses only 1 GPU and 1 context/cmd queue
+#define OPENCL_MAX_NUM_GPUS 1
+#define OPENCL_MAX_QUEUE_SIZE 1
+#define OPENCL_LOCAL_WORK_SIZE 64
 
 typedef struct {
     cl_mem hashes;
     cl_mem num_hashes_arr;
     size_t num_elems_alloc;
     pthread_mutex_t mutex;
-    //cudaStream_t stream;
 } gpu_ctx;
 
 static pthread_mutex_t g_ctx_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-static gpu_ctx g_gpu_ctx[MAX_NUM_GPUS][MAX_QUEUE_SIZE] = {0};
+static gpu_ctx g_gpu_ctx[OPENCL_MAX_NUM_GPUS][OPENCL_MAX_QUEUE_SIZE] = {0};
 static uint32_t g_cur_gpu = 0;
-static uint32_t g_cur_queue[MAX_NUM_GPUS] = {0};
+static uint32_t g_cur_queue[OPENCL_MAX_NUM_GPUS] = {0};
 static int32_t g_total_gpus = -1;
 
 static bool poh_init_locked() {
-	/*
+
     if (g_total_gpus == -1) {
-        cudaGetDeviceCount(&g_total_gpus);
-        g_total_gpus = min(MAX_NUM_GPUS, g_total_gpus);
+        g_total_gpus = OPENCL_MAX_NUM_GPUS;
         LOG("total_gpus: %d\n", g_total_gpus);
         for (int gpu = 0; gpu < g_total_gpus; gpu++) {
-            CUDA_CHK(cudaSetDevice(gpu));
-            for (int queue = 0; queue < MAX_QUEUE_SIZE; queue++) {
+            
+            for (int queue = 0; queue < OPENCL_MAX_QUEUE_SIZE; queue++) {
                 int err = pthread_mutex_init(&g_gpu_ctx[gpu][queue].mutex, NULL);
                 if (err != 0) {
                     fprintf(stderr, "pthread_mutex_init error %d gpu: %d queue: %d\n",
@@ -40,21 +39,14 @@ static bool poh_init_locked() {
                     g_total_gpus = 0;
                     return false;
                 }
-                CUDA_CHK(cudaStreamCreate(&g_gpu_ctx[gpu][queue].stream));
             }
         }
     }
-    return g_total_gpus > 0;
-	*/
-	
-	// TODO hardcoded OpenCL current support
-	g_total_gpus = 1;
 	
     return g_total_gpus > 0;
 }
 
 bool poh_init() {
-    //cudaFree(0);
     pthread_mutex_lock(&g_ctx_mutex);
     bool success = poh_init_locked();
     pthread_mutex_unlock(&g_ctx_mutex);
@@ -88,7 +80,7 @@ int poh_verify_many(uint8_t* hashes,
     g_cur_gpu %= g_total_gpus;
     cur_queue = g_cur_queue[cur_gpu];
     g_cur_queue[cur_gpu]++;
-    g_cur_queue[cur_gpu] %= MAX_QUEUE_SIZE;
+    g_cur_queue[cur_gpu] %= OPENCL_MAX_QUEUE_SIZE;
     pthread_mutex_unlock(&g_ctx_mutex);
 
     gpu_ctx* cur_ctx = &g_gpu_ctx[cur_gpu][cur_queue];
@@ -113,28 +105,20 @@ int poh_verify_many(uint8_t* hashes,
         cur_ctx->num_elems_alloc = num_elems;
     }
 
-    //cudaStream_t stream = 0;
-    //if (0 != use_non_default_stream) {
-    //    stream = cur_ctx->stream;
-    //}
-
 	CL_ERR( clEnqueueWriteBuffer(cmd_queue, cur_ctx->hashes, CL_TRUE, 0, hashes_size, hashes, 0, NULL, NULL));
 	CL_ERR( clEnqueueWriteBuffer(cmd_queue, cur_ctx->num_hashes_arr, CL_TRUE, 0, num_hashes_size, num_hashes_arr, 0, NULL, NULL));
 	
-    size_t num_blocks = ROUND_UP_DIV(num_elems, NUM_THREADS_PER_BLOCK);
-	size_t num_threads_block = NUM_THREADS_PER_BLOCK;
-
-    //poh_verify_kernel<<<num_blocks, NUM_THREADS_PER_BLOCK, 0, stream>>>(cur_ctx->hashes, cur_ctx->num_hashes_arr, num_elems);
-    //CUDA_CHK(cudaPeekAtLastError());
+    size_t num_blocks = ROUND_UP_DIV(num_elems, OPENCL_LOCAL_WORK_SIZE);
+	size_t num_threads_block = OPENCL_LOCAL_WORK_SIZE;
 	
 	CL_ERR( clSetKernelArg(poh_verify_kernel, 0, sizeof(cl_mem), (void *)&cur_ctx->hashes) );
 	CL_ERR( clSetKernelArg(poh_verify_kernel, 1, sizeof(cl_mem), (void *)&cur_ctx->num_hashes_arr) );
 	CL_ERR( clSetKernelArg(poh_verify_kernel, 2, sizeof(size_t), (void *)&num_elems) );
 
-	size_t globalSize[2] = {num_blocks * num_threads_block, 0};
-	size_t localSize[2] = {num_threads_block, 0};	
+	size_t global_size[2] = {num_blocks * num_threads_block, 0};
+	size_t local_size[2] = {num_threads_block, 0};	
 	ret = clEnqueueNDRangeKernel(cmd_queue, poh_verify_kernel, 1, NULL,
-		globalSize, localSize, 0, NULL, NULL);
+		global_size, local_size, 0, NULL, NULL);
 		CL_ERR( ret );
 	
 	CL_ERR( clEnqueueReadBuffer(cmd_queue, cur_ctx->hashes, CL_TRUE, 0, hashes_size, hashes, 0, NULL, NULL));

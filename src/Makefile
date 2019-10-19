@@ -24,11 +24,13 @@ CL_CHACHA_TEST_BIN=cl_chacha_test
 CL_ECC_TEST_BIN=cl_ed25519_verify
 CL_LIB=cl-crypt
 
+CL_HEADER_DIR:=opencl-platform
 CUDA_HEADER_DIR:=cuda-headers
 CUDA_SHA256_DIR:=cuda-sha256
 
 CFLAGS+=-DENDIAN_NEUTRAL -DLTC_NO_ASM -I$(CUDA_HEADER_DIR) -I$(CUDA_SHA256_DIR)
-CL_CFLAGS=-std=c++11 -DENDIAN_NEUTRAL -DUSE_RDTSC -I$(CUDA_HEADER_DIR) -I$(CUDA_SHA256_DIR) -I$(CL_HEADER_DIR) -L$(CL_LIBRARY_DIR)
+#use -DUSE_RDTSC for Windows compilation
+CL_CFLAGS=-std=c++11 -DENDIAN_NEUTRAL -DLTC_NO_ASM -I$(CUDA_HEADER_DIR) -I$(CUDA_SHA256_DIR) -I$(CL_HEADER_DIR) -L$(CL_LIBRARY_DIR)
 
 all: $V/$(CHACHA_TEST_BIN) $V/$(ECC_TEST_BIN) $(V)/lib$(LIB).so
 
@@ -76,7 +78,7 @@ $V/aes_cbc.o: $(AES_SRCS)
 
 # OpenCL transition compile rules 2
 # TODO unify with CUDA ones
-CL_AES_SRCS:=$(addprefix $(CL_CHACHA_DIR)/,aes_cbc.cpp modes_lcl.h)
+CL_AES_SRCS:=$(addprefix $(CL_CHACHA_DIR)/,aes_cbc.cpp aes_core.cpp modes_lcl.h)
 
 $V/cl_aes_cbc.o: $(CL_AES_SRCS)
 	@mkdir -p $(@D)

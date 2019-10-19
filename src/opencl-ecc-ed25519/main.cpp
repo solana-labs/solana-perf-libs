@@ -5,7 +5,7 @@
 #include <assert.h>
 #include <vector>
 #include <pthread.h>
-#include "gpu_common.h"
+#include "cl_common.h"
 
 #define USE_CLOCK_GETTIME
 #include "perftime.h"
@@ -106,6 +106,8 @@ int main(int argc, const char* argv[]) {
     }
 
     ed25519_set_verbose(verbose);
+	
+	DIE(cl_check_init(CL_DEVICE_TYPE_GPU) == false, "OpenCL could not be init");
 
     int num_signatures_per_elem = strtol(argv[arg++], NULL, 10);
     if (num_signatures_per_elem <= 0) {
