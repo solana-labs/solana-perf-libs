@@ -1,36 +1,14 @@
-#include "aes.h"
+
+#ifdef _MSC_VER
+#include <Windows.h>
+#endif
+
 #include "chacha.h"
 #include <stdio.h>
 #include <inttypes.h>
 #include "perftime.h"
 #include <algorithm>
-
-void print_bytes(const char* name, const uint8_t* input, size_t len)
-{
-    printf("%s:\n", name);
-    for (size_t i = 0; i < std::min(len, (size_t)64); i++) {
-        //if ((i % 1024) == 0) {
-            printf("%x ", input[i]);
-        //}
-    }
-    printf("\n");
-}
-
-uint32_t verbose_memcmp(void* a, void* b, size_t size)
-{
-    uint8_t* a8 = (uint8_t*)a;
-    uint8_t* b8 = (uint8_t*)b;
-    uint32_t num_errors = 0;
-    for (size_t j = 0; j < size; j++) {
-        if (a8[j] != b8[j]) {
-            if (num_errors < 1) {
-                printf("mismatch @(j=%zu) ref: %d actual: %d\n", j, a8[j], b8[j]);
-            }
-            num_errors++;
-        }
-    }
-    return num_errors;
-}
+#include "common.h"
 
 typedef struct {
     size_t len;
@@ -38,10 +16,6 @@ typedef struct {
     uint8_t* input;
     uint8_t* output;
     uint8_t* output_ref;
-
-    uint8_t ivec_orig[AES_BLOCK_SIZE];
-    uint8_t ivec[AES_BLOCK_SIZE];
-    uint8_t ivec_ref[AES_BLOCK_SIZE];
 
     uint8_t chacha_ivec[CHACHA_BLOCK_SIZE];
     uint8_t chacha_ivec_orig[CHACHA_BLOCK_SIZE];
@@ -276,85 +250,6 @@ int test_chacha_ctr(ctx_t* gctx)
     return 0;
 }
 
-int test_aes(ctx_t* gctx)
-{
-    printf("Starting gpu aes..\n");
-    AES_KEY key;
-    unsigned char key_str[16] = "foobar";
-    int res = AES_set_encrypt_key(key_str, 128, &key);
-    if (res == 0) {
-        printf("we have a key..  rounds=%d\n", key.rounds);
-    } else {
-        printf("error!: %d\n", res);
-        return 1;
-    }
-
-    AES_cbc_encrypt(gctx->input, gctx->output_ref, gctx->len, &key, gctx->ivec, AES_ENCRYPT);
-    memcpy(gctx->ivec_ref, gctx->ivec, sizeof(gctx->ivec));
-
-    printf("\n\n");
-    print_bytes("output_ref", gctx->output_ref, gctx->len);
-
-    int iterations = 1;
-    perftime_t start, end;
-    get_time(&start);
-    for (int i = 0; i < iterations; i++) {
-        AES_cbc_encrypt(gctx->input, gctx->output, gctx->len, &key, gctx->ivec, AES_ENCRYPT);
-    }
-    get_time(&end);
-
-    print_bytes("output", gctx->output, gctx->len);
-
-    float time_us = get_diff(&start, &end);
-    float ns_per_byte = 1000.f * time_us / ((float)iterations * (float)gctx->len);
-    printf("time: %f ns/byte time: %f us\n", ns_per_byte, time_us);
-
-    uint8_t* outputs = (uint8_t*)calloc(gctx->len, gctx->num_keys);
-    uint8_t* ivecs = (uint8_t*)calloc(16, gctx->num_keys);
-    AES_KEY* keys = (AES_KEY*)calloc(sizeof(AES_KEY), gctx->num_keys);
-
-    for (uint32_t i = 0; i < gctx->num_keys; i++) {
-        int res = AES_set_encrypt_key(key_str, 128, &keys[i]);
-        if (res != 0) {
-            printf("Something wrong res: %d\n", res);
-            return 1;
-        }
-        memcpy(&ivecs[i * AES_BLOCK_SIZE], gctx->ivec_orig, AES_BLOCK_SIZE);
-    }
-
-    AES_cbc_encrypt_many(gctx->input, outputs, gctx->len, keys, ivecs, gctx->num_keys, &time_us);
-
-    ns_per_byte = 1000.f * time_us / ((float)gctx->len * (float)gctx->num_keys);
-    printf("gpu time: %f ns/byte time: %f us\n", ns_per_byte, time_us);
-
-    int output_errors = 0, ivec_errors = 0;
-    for (uint32_t i = 0; i < gctx->num_keys; i++) {
-        if (0 != verbose_memcmp(gctx->output_ref, &outputs[i * gctx->len], gctx->len)) {
-            if (output_errors < 10) {
-                printf("%d gpu output not matching! %x\n", i, outputs[0]);
-            }
-            output_errors++;
-            break;
-        }
-        if (0 != verbose_memcmp(gctx->ivec_ref, &ivecs[i * 16], 16)) {
-            if (ivec_errors < 1) {
-                printf("%d ivecs output not matching! %x\n", i, ivecs[0]);
-            }
-            ivec_errors++;
-        }
-    }
-    printf("total keys: %d output_errors: %d ivec_errors: %d\n", gctx->num_keys, output_errors, ivec_errors);
-
-    print_bytes("gpu output", outputs, gctx->len);
-    print_bytes("gpu ivec", ivecs, 16);
-
-    free(outputs);
-    free(ivecs);
-    free(keys);
-
-    return 0;
-}
-
 int main(int argc, const char* argv[]) {
     printf("Starting gpu crypto..\n");
     ctx_t ctx = {0};
@@ -379,15 +274,11 @@ int main(int argc, const char* argv[]) {
     ctx.input = (uint8_t*)calloc(ctx.len, 1);
     ctx.output = (uint8_t*)calloc(ctx.len, 1);
     ctx.output_ref = (uint8_t*)calloc(ctx.len, 1);
-    uint8_t ivec_orig[16] = {0xde, 0xad, 0xbe, 0xef};
-    memcpy(ctx.ivec_orig, ivec_orig, sizeof(ctx.ivec_orig));
-    memcpy(ctx.ivec, ivec_orig, sizeof(ctx.ivec));
 
     uint8_t chacha_ivec_orig[CHACHA_BLOCK_SIZE] = {0xde, 0xad, 0xbe, 0xef};
     memcpy(ctx.chacha_ivec_orig, chacha_ivec_orig, sizeof(ctx.chacha_ivec_orig));
     memcpy(ctx.chacha_ivec, chacha_ivec_orig, sizeof(ctx.chacha_ivec));
 
-    //test_aes(&ctx);
     clear_ctx(&ctx);
 
     //test_chacha_ctr(&ctx);

@@ -1,6 +1,6 @@
 #include <stddef.h>
 #include <inttypes.h>
-#include <pthread.h>
+#include "thread.h"
 #include "gpu_common.h"
 #include "sha256.cu"
 
@@ -41,6 +41,8 @@ static gpu_ctx g_gpu_ctx[MAX_NUM_GPUS][MAX_QUEUE_SIZE] = {0};
 static uint32_t g_cur_gpu = 0;
 static uint32_t g_cur_queue[MAX_NUM_GPUS] = {0};
 static int32_t g_total_gpus = -1;
+
+static bool g_verbose = false;
 
 static bool poh_init_locked() {
     if (g_total_gpus == -1) {

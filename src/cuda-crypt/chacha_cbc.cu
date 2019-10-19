@@ -1,3 +1,9 @@
+#ifdef _WIN32
+#include <Windows.h>
+typedef unsigned __int64    ssize_t;
+#endif
+
+#include <inttypes.h>
 #include "common.cu"
 #include "chacha.h"
 #include "modes_lcl.h"
@@ -9,6 +15,8 @@
 #if !defined(STRICT_ALIGNMENT) && !defined(PEDANTIC)
 # define STRICT_ALIGNMENT 0
 #endif
+
+static bool g_verbose = 0;
 
 __host__ __device__ void cuda_chacha20_cbc128_encrypt(const unsigned char* in, unsigned char* out,
                                                       uint32_t len, const uint8_t* key,
@@ -311,7 +319,7 @@ void chacha_cbc_encrypt_many_sample(const uint8_t* in,
 
     LOG("samples:");
     for (uint32_t i = 0; i < num_samples; i++) {
-        LOG("%ld ", samples[i]);
+        LOG("%ld ", (long)samples[i]);
     }
     LOG("\n");
 
@@ -346,12 +354,8 @@ void chacha_cbc_encrypt_many_sample(const uint8_t* in,
 
     get_time(&start);
 
-    //cudaStream_t stream, stream0, stream1;
-    //cudaStreamCreate(&stream0);
-    //cudaStreamCreate(&stream1);
-
     ssize_t slength = length;
-    size_t num_data_blocks = std::max(1ul, (length + BLOCK_SIZE - 1) / (BLOCK_SIZE));
+    size_t num_data_blocks = std::max((size_t)1, (length + BLOCK_SIZE - 1) / (BLOCK_SIZE));
 
     LOG("num_blocks: %d threads_per_block: %d keys size: %zu in: %p ind0: %p ind1: %p output_size: %zu num_data_blocks: %zu\n",
                     num_blocks, num_threads_per_block, keys_size, in, in_device0, in_device1, output_size, num_data_blocks);
@@ -367,16 +371,9 @@ void chacha_cbc_encrypt_many_sample(const uint8_t* in,
     LOG("\n");
 
     for (uint32_t i = 0;; i++) {
-        //if (i & 0x1) {
-        if (0) {
-            in_device = in_device1;
-            output_device = output_device1;
-            //stream = stream1;
-        } else {
-            in_device = in_device0;
-            output_device = output_device0;
-            //stream = stream0;
-        }
+        in_device = in_device1;
+        output_device = output_device1;
+
         size_t size = std::min(slength, (ssize_t)BLOCK_SIZE);
         LOG("copying to in_device: %p in: %p size: %zu num_data_blocks: %zu\n", in_device, in, size, num_data_blocks);
         CUDA_CHK(cudaMemcpy(in_device, in, size, cudaMemcpyHostToDevice));
@@ -486,16 +483,9 @@ void chacha_ctr_encrypt_many(const unsigned char *in, unsigned char *out,
                     num_blocks, num_threads_per_block, keys_size, in, in_device0, in_device1, output_size, num_data_blocks);
 
     for (uint32_t i = 0;; i++) {
-        //if (i & 0x1) {
-        if (0) {
-            in_device = in_device1;
-            output_device = output_device1;
-            stream = stream1;
-        } else {
-            in_device = in_device0;
-            output_device = output_device0;
-            stream = stream0;
-        }
+        in_device = in_device0;
+        output_device = output_device0;
+        stream = stream0;
         size_t size = std::min(slength, (ssize_t)BLOCK_SIZE);
         //printf("copying to in_device: %p in: %p size: %zu num_data_blocks: %zu\n", in_device, in, size, num_data_blocks);
         CUDA_CHK(cudaMemcpyAsync(in_device, in, size, cudaMemcpyHostToDevice, stream));

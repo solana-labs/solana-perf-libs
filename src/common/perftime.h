@@ -1,6 +1,29 @@
 #ifndef PERFTIME_H
 #define PERFTIME_H
 
+#ifdef _MSC_VER
+#include <profileapi.h>
+#include <cstdint>
+
+typedef struct {
+    LARGE_INTEGER count;
+} perftime_t;
+
+static int get_time(perftime_t* t) {
+    return (int)QueryPerformanceCounter(&t->count);
+}
+
+#define TIME_AS_UINT64(time) ((uint64_t)time->count.LowPart | ((uint64_t)time->count.HighPart << 32))
+
+static double get_us(const perftime_t* time) {
+    return (double)TIME_AS_UINT64(time);
+}
+
+static double get_diff(const perftime_t* start, const perftime_t* end) {
+    return (double)(TIME_AS_UINT64(end) - TIME_AS_UINT64(start));
+}
+
+#else
 #ifdef USE_RDTSC
 static inline uint64_t rdtsc()
 {
@@ -47,4 +70,5 @@ static double get_diff(const perftime_t* start, const perftime_t* end) {
     return get_us(end) - get_us(start);
 }
 
+#endif
 #endif

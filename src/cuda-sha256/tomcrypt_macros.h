@@ -250,8 +250,15 @@ do { x = (((ulong64)((y)[7] & 255))<<56)|(((ulong64)((y)[6] & 255))<<48) | \
                     ((x>>8)&0x0000FF00UL)  | ((x<<8)&0x00FF0000UL) )
 
 
-/* 32-bit Rotates */
-#if defined(_MSC_VER)
+/* cuda rotates */
+#if defined(__CUDA_ARCH__)
+
+# define ROL(x,n) __byte_perm(x, 0, 0x0321)
+# define ROR(x,n) __byte_perm(x, 0, 0x2103)
+# define ROLc(x,n) ROL(x,n)
+# define RORc(x,n) ROR(x,n)
+
+#elif defined(_MSC_VER)
 #define LTC_ROx_ASM
 
 /* instrinsic rotate */
@@ -261,13 +268,6 @@ do { x = (((ulong64)((y)[7] & 255))<<56)|(((ulong64)((y)[6] & 255))<<48) | \
 #define ROL(x,n) _lrotl(x,n)
 #define RORc(x,n) _lrotr(x,n)
 #define ROLc(x,n) _lrotl(x,n)
-
-#elif defined(__CUDA__ARCH__)
-
-# define ROL(x,n) __byte_perm(x, 0, 0x0321)
-# define ROR(x,n) __byte_perm(x, 0, 0x2103)
-# define ROLc(x,n) ROL(x,n)
-# define RORc(x,n) ROR(x,n)
 
 #elif !defined(__STRICT_ANSI__) && defined(__GNUC__) && (defined(__i386__) || defined(__x86_64__)) && !defined(INTEL_CC) && !defined(LTC_NO_ASM)
 #define LTC_ROx_ASM

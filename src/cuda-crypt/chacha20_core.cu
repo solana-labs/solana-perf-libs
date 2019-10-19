@@ -1,4 +1,5 @@
 #include "chacha.h"
+#include "modes_lcl.h"
 
 #define ROTL32(v, n) (((v) << (n)) | ((v) >> (32 - (n))))
 

@@ -10,7 +10,7 @@
 #include "sha512.cu"
 
 #include "ed25519.h"
-#include <pthread.h>
+#include "thread.h"
 
 #include "gpu_common.h"
 

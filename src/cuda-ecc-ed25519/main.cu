@@ -3,8 +3,10 @@
 #include <inttypes.h>
 #include <assert.h>
 #include <vector>
-#include <pthread.h>
+#include "thread.h"
 #include "gpu_common.h"
+
+bool g_verbose = false;
 
 #define USE_CLOCK_GETTIME
 #include "perftime.h"
@@ -51,7 +53,11 @@ typedef struct {
     uint8_t use_non_default_stream;
 } verify_ctx_t;
 
+#if _MSC_VER
+DWORD WINAPI verify_proc(LPVOID ctx) {
+#else
 static void* verify_proc(void* ctx) {
+#endif
     verify_ctx_t* vctx = (verify_ctx_t*)ctx;
     for (int i = 0; i < vctx->num_iterations; i++) {
         ed25519_verify_many(&vctx->elems_h[0],
@@ -105,6 +111,7 @@ int main(int argc, const char* argv[]) {
     }
 
     ed25519_set_verbose(verbose);
+	g_verbose = verbose;
 
     int num_signatures_per_elem = strtol(argv[arg++], NULL, 10);
     if (num_signatures_per_elem <= 0) {
@@ -295,7 +302,10 @@ int main(int argc, const char* argv[]) {
         }
         LOG("\n");
         fflush(stdout);
-        assert(verify_failed == false);
+        if (verify_failed) {
+            fprintf(stderr, "verify failed!");
+            exit(1);
+        }
     }
 
     ed25519_free(elems_h);

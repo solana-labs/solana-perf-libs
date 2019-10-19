@@ -7,6 +7,9 @@
  * https://www.openssl.org/source/license.html
  */
 
+#ifndef MODES_LCL_H
+#define MODES_LCL_H
+
 #include "modes.h"
 
 #if (defined(_WIN32) || defined(_WIN64)) && !defined(__MINGW32__)
@@ -198,3 +201,5 @@ struct ocb128_context {
     } sess;
 };
 #endif                          /* OPENSSL_NO_OCB */
+
+#endif
