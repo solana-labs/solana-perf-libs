@@ -40,9 +40,9 @@ VERIFY_SRCS:=$(addprefix $(ECC_DIR)/,verify.cu seed.cu sha512.cu ge.cu sc.cu fe.
 $V/verify.o: $(VERIFY_SRCS)
 	@mkdir -p $(@D)
 	$(NVCC) -rdc=true $(CFLAGS) -c $< -o $@
-	
+
 CL_ECC_DIR:=opencl-ecc-ed25519
-CL_VERIFY_SRCS:=$(addprefix $(CL_ECC_DIR)/,verify.cpp seed.cu sha512.cu ge.cu sc.cu fe.cu sign.cu keypair.cu common.cu ed25519.h)
+CL_VERIFY_SRCS:=$(addprefix $(CL_ECC_DIR)/,verify.cpp seed.c sha512.c ge.c sc.c fe.c sign.c keypair.c common.c ed25519.h)
 
 $V/cl_verify.o: $(CL_VERIFY_SRCS)
 	@mkdir -p $(@D)
@@ -54,15 +54,11 @@ CHACHA_SRCS:=$(addprefix $(CHACHA_DIR)/,chacha_cbc.cu chacha.h common.cu)
 $V/chacha_cbc.o: $(CHACHA_SRCS)
 	@mkdir -p $(@D)
 	$(NVCC) -rdc=true $(CFLAGS) -c $< -o $@
-	
-# OpenCL platform code
-# This is particular to OpenCL and is not required for CUDA
+
 $V/cl_init_platform.o: opencl-platform/cl_init_platform.cpp
 	@mkdir -p $(@D)
 	g++ $(CL_CFLAGS) -c $< -o $@
-	
-# OpenCL transition compile rules 1
-# TODO unify with CUDA ones
+
 CL_CHACHA_DIR:=opencl-crypt
 CL_CHACHA_SRCS:=$(addprefix $(CL_CHACHA_DIR)/,chacha_cbc.cpp chacha.h)
 
@@ -76,8 +72,6 @@ $V/aes_cbc.o: $(AES_SRCS)
 	@mkdir -p $(@D)
 	$(NVCC) -rdc=true $(CFLAGS) -c $< -o $@
 
-# OpenCL transition compile rules 2
-# TODO unify with CUDA ones
 CL_AES_SRCS:=$(addprefix $(CL_CHACHA_DIR)/,aes_cbc.cpp aes_core.cpp modes_lcl.h)
 
 $V/cl_aes_cbc.o: $(CL_AES_SRCS)
@@ -90,7 +84,7 @@ POH_SRCS:=$(addprefix $(POH_DIR)/,poh_verify.cu)
 $V/poh_verify.o: $(POH_SRCS)
 	@mkdir -p $(@D)
 	$(NVCC) -rdc=true $(CFLAGS) -c $< -o $@
-	
+
 CL_POH_DIR:=opencl-poh-verify
 CL_POH_SRCS:=$(addprefix $(CL_POH_DIR)/,poh_verify.cpp)
 
@@ -103,14 +97,14 @@ $V/cl_crypt-dlink.o: $V/cl_init_platform.o $V/cl_chacha_cbc.o $V/cl_aes_cbc.o $V
 
 $V/lib$(CL_LIB).a: $V/cl_crypt-dlink.o $V/cl_init_platform.o $V/cl_chacha_cbc.o $V/cl_aes_cbc.o $V/cl_verify.o $V/cl_poh_verify.o
 	ar rcs $@ $^
-	
+
 $V/lib$(CL_LIB).so: $V/cl_crypt-dlink.o $V/cl_init_platform.o $V/cl_chacha_cbc.o $V/cl_aes_cbc.o $V/cl_verify.o $V/cl_poh_verify.o
 	g++ -shared --shared $^ -o $@
-	
+
 $V/cl_ecc_main.o: $(addprefix $(CL_ECC_DIR)/,main.cpp ed25519.h)
 	@mkdir -p $(@D)
 	g++ $(CL_CFLAGS) -c $< -o $@
-	
+
 $V/$(CL_ECC_TEST_BIN): $V/cl_ecc_main.o $V/lib$(CL_LIB).a
 	g++ $(CL_CFLAGS) -Wl,-v -L/usr/local/cuda-9.1/lib64 -L$V -lpthread $^ -lOpenCL -o $@
 

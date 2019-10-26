@@ -6,7 +6,7 @@
 r = p + q
 */
 
-void __host__ __device__ ge_add(ge_p1p1 *r, const ge_p3 *p, const ge_cached *q) {
+void ge_add(ge_p1p1 *r, const ge_p3 *p, const ge_cached *q) {
     fe t0;
     fe_add(r->X, p->Y, p->X);
     fe_sub(r->Y, p->Y, p->X);
@@ -22,7 +22,7 @@ void __host__ __device__ ge_add(ge_p1p1 *r, const ge_p3 *p, const ge_cached *q) 
 }
 
 
-static void __host__ __device__ slide(signed char *r, const unsigned char *a) {
+static void slide(signed char *r, const unsigned char *a) {
     int i;
     int b;
     int k;
@@ -64,7 +64,7 @@ and b = b[0]+256*b[1]+...+256^31 b[31].
 B is the Ed25519 base point (x,4/5) with x positive.
 */
 
-void __host__ __device__ ge_double_scalarmult_vartime(ge_p2 *r, const unsigned char *a, const ge_p3 *A, const unsigned char *b) {
+void ge_double_scalarmult_vartime(ge_p2 *r, const unsigned char *a, const ge_p3 *A, const unsigned char *b) {
     signed char aslide[256];
     signed char bslide[256];
     ge_cached Ai[8]; /* A,3A,5A,7A,9A,11A,13A,15A */
@@ -130,15 +130,15 @@ void __host__ __device__ ge_double_scalarmult_vartime(ge_p2 *r, const unsigned c
 }
 
 
-static const __device__ fe d = {
+static const fe d = {
     -10913610, 13857413, -15372611, 6949391, 114729, -8787816, -6275908, -3247719, -18696448, -12055116
 };
 
-static const __device__ fe sqrtm1 = {
+static const fe sqrtm1 = {
     -32595792, -7943725, 9377950, 3500415, 12389472, -272473, -25146209, -2005654, 326686, 11406482
 };
 
-int __device__ __host__ ge_frombytes_negate_vartime(ge_p3 *h, const unsigned char *s) {
+int ge_frombytes_negate_vartime(ge_p3 *h, const unsigned char *s) {
     fe u;
     fe v;
     fe v3;
@@ -185,7 +185,7 @@ int __device__ __host__ ge_frombytes_negate_vartime(ge_p3 *h, const unsigned cha
 r = p + q
 */
 
-void __host__ __device__ ge_madd(ge_p1p1 *r, const ge_p3 *p, const ge_precomp *q) {
+void ge_madd(ge_p1p1 *r, const ge_p3 *p, const ge_precomp *q) {
     fe t0;
     fe_add(r->X, p->Y, p->X);
     fe_sub(r->Y, p->Y, p->X);
@@ -204,7 +204,7 @@ void __host__ __device__ ge_madd(ge_p1p1 *r, const ge_p3 *p, const ge_precomp *q
 r = p - q
 */
 
-void __host__ __device__ ge_msub(ge_p1p1 *r, const ge_p3 *p, const ge_precomp *q) {
+void ge_msub(ge_p1p1 *r, const ge_p3 *p, const ge_precomp *q) {
     fe t0;
 
     fe_add(r->X, p->Y, p->X);
@@ -224,7 +224,7 @@ void __host__ __device__ ge_msub(ge_p1p1 *r, const ge_p3 *p, const ge_precomp *q
 r = p
 */
 
-void __host__ __device__ ge_p1p1_to_p2(ge_p2 *r, const ge_p1p1 *p) {
+void ge_p1p1_to_p2(ge_p2 *r, const ge_p1p1 *p) {
     fe_mul(r->X, p->X, p->T);
     fe_mul(r->Y, p->Y, p->Z);
     fe_mul(r->Z, p->Z, p->T);
@@ -236,7 +236,7 @@ void __host__ __device__ ge_p1p1_to_p2(ge_p2 *r, const ge_p1p1 *p) {
 r = p
 */
 
-void __host__ __device__ ge_p1p1_to_p3(ge_p3 *r, const ge_p1p1 *p) {
+void ge_p1p1_to_p3(ge_p3 *r, const ge_p1p1 *p) {
     fe_mul(r->X, p->X, p->T);
     fe_mul(r->Y, p->Y, p->Z);
     fe_mul(r->Z, p->Z, p->T);
@@ -244,7 +244,7 @@ void __host__ __device__ ge_p1p1_to_p3(ge_p3 *r, const ge_p1p1 *p) {
 }
 
 
-void __host__ __device__ ge_p2_0(ge_p2 *h) {
+void ge_p2_0(ge_p2 *h) {
     fe_0(h->X);
     fe_1(h->Y);
     fe_1(h->Z);
@@ -256,7 +256,7 @@ void __host__ __device__ ge_p2_0(ge_p2 *h) {
 r = 2 * p
 */
 
-void __host__ __device__ ge_p2_dbl(ge_p1p1 *r, const ge_p2 *p) {
+void ge_p2_dbl(ge_p1p1 *r, const ge_p2 *p) {
     fe t0;
 
     fe_sq(r->X, p->X);
@@ -283,7 +283,7 @@ void ge_p3_0(ge_p3 *h) {
 r = 2 * p
 */
 
-void __host__ __device__ ge_p3_dbl(ge_p1p1 *r, const ge_p3 *p) {
+void ge_p3_dbl(ge_p1p1 *r, const ge_p3 *p) {
     ge_p2 q;
     ge_p3_to_p2(&q, p);
     ge_p2_dbl(r, &q);
@@ -295,11 +295,11 @@ void __host__ __device__ ge_p3_dbl(ge_p1p1 *r, const ge_p3 *p) {
 r = p
 */
 
-static const __device__ fe d2 = {
+static const fe d2 = {
     -21827239, -5839606, -30745221, 13898782, 229458, 15978800, -12551817, -6495438, 29715968, 9444199
 };
 
-void __host__ __device__ ge_p3_to_cached(ge_cached *r, const ge_p3 *p) {
+void ge_p3_to_cached(ge_cached *r, const ge_p3 *p) {
     fe_add(r->YplusX, p->Y, p->X);
     fe_sub(r->YminusX, p->Y, p->X);
     fe_copy(r->Z, p->Z);
@@ -438,7 +438,7 @@ void ge_scalarmult_base(ge_p3 *h, const unsigned char *a) {
 r = p - q
 */
 
-void __host__ __device__ ge_sub(ge_p1p1 *r, const ge_p3 *p, const ge_cached *q) {
+void ge_sub(ge_p1p1 *r, const ge_p3 *p, const ge_cached *q) {
     fe t0;
     
     fe_add(r->X, p->Y, p->X);
@@ -455,7 +455,7 @@ void __host__ __device__ ge_sub(ge_p1p1 *r, const ge_p3 *p, const ge_cached *q) 
 }
 
 
-void __host__ __device__ ge_tobytes(unsigned char *s, const ge_p2 *h) {
+void ge_tobytes(unsigned char *s, const ge_p2 *h) {
     fe recip;
     fe x;
     fe y;

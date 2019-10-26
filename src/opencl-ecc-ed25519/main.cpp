@@ -70,23 +70,12 @@ static void* verify_proc(void* ctx) {
     return NULL;
 }
 
-const static bool USE_CUDA_ALLOC = true;
-
 template<typename T> static void ed25519_alloc(T** ptr, size_t num) {
-    //if (USE_CUDA_ALLOC) {
-    //    CUDA_CHK(cudaMallocHost(ptr, sizeof(T) * num));
-    //} else {
-        *ptr = (T*)calloc(sizeof(T), num);
-    //}
+    *ptr = (T*)calloc(sizeof(T), num);
 }
 
 static void ed25519_free(void* ptr) {
-    //if (USE_CUDA_ALLOC) {
-    //    CUDA_CHK(cudaFreeHost(ptr));
-    //} else {
-        free(ptr);
-    //}
-
+    free(ptr);
 }
 
 int main(int argc, const char* argv[]) {
@@ -106,8 +95,8 @@ int main(int argc, const char* argv[]) {
     }
 
     ed25519_set_verbose(verbose);
-	
-	DIE(cl_check_init(CL_DEVICE_TYPE_GPU) == false, "OpenCL could not be init");
+
+    DIE(cl_check_init(CL_DEVICE_TYPE_GPU) == false, "OpenCL could not be init");
 
     int num_signatures_per_elem = strtol(argv[arg++], NULL, 10);
     if (num_signatures_per_elem <= 0) {
@@ -224,6 +213,9 @@ int main(int argc, const char* argv[]) {
 
     LOG("creating seed..\n");
     int ret = ed25519_create_seed(seed_h);
+    for(int i = 0; i < SEED_SIZE; i++) {
+        seed_h[i] = i;
+    }
     LOG("create_seed: %d\n", ret);
     packet_t* first_packet_h = (packet_t*)packets_h[0].data;
     ed25519_create_keypair(first_packet_h->public_key, private_key_h, seed_h);

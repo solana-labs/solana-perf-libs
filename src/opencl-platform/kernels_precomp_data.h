@@ -1,17 +1,17 @@
 const char *kernels_precomp_data_src = R""""(
 
-#define uint64_t	ulong
-#define uint32_t	uint
-#define uint16_t	ushort
-#define uint8_t		uchar
+#define uint64_t    ulong
+#define uint32_t    uint
+#define uint16_t    ushort
+#define uint8_t     uchar
 
-#define int64_t		long
-#define int32_t		int
-#define int16_t		short
-#define int8_t		char
+#define int64_t     long
+#define int32_t     int
+#define int16_t     short
+#define int8_t      char
 
-#define UINT64_C(x) 	(ulong)x
-#define INT64_C(x) 		(long)x
+#define UINT64_C(x)     (ulong)x
+#define INT64_C(x)      (long)x
 
 /* state */
 typedef struct sha512_context_ {

@@ -5,7 +5,6 @@
 #include "cl_common.h"
 #include "sha256.cu"
 
-// TODO OpenCL uses only 1 GPU and 1 context/cmd queue
 #define OPENCL_MAX_NUM_GPUS 1
 #define OPENCL_MAX_QUEUE_SIZE 1
 #define OPENCL_LOCAL_WORK_SIZE 64
@@ -42,7 +41,7 @@ static bool poh_init_locked() {
             }
         }
     }
-	
+    
     return g_total_gpus > 0;
 }
 
@@ -59,10 +58,10 @@ int poh_verify_many(uint8_t* hashes,
                     size_t num_elems,
                     uint8_t use_non_default_stream)
 {
-	DIE(cl_check_init() == false, "OpenCL could not be init");
+    DIE(cl_check_init() == false, "OpenCL could not be init");
     
     int ret;
-	
+    
     LOG("Starting poh_verify_many: num_elems: %zu\n", num_elems);
 
     if (num_elems == 0) return 0;
@@ -93,35 +92,35 @@ int poh_verify_many(uint8_t* hashes,
 
     // Ensure there is enough memory allocated
     if (cur_ctx->hashes == NULL || cur_ctx->num_elems_alloc < num_elems) {
-		
-		CL_ERR(clReleaseMemObject(cur_ctx->hashes));
-		cur_ctx->hashes = clCreateBuffer(context, CL_MEM_READ_WRITE, hashes_size, NULL, &ret);
-		CL_ERR( ret );
-		
-		CL_ERR(clReleaseMemObject(cur_ctx->num_hashes_arr));
-		cur_ctx->num_hashes_arr = clCreateBuffer(context, CL_MEM_READ_WRITE, num_hashes_size, NULL, &ret);
-		CL_ERR( ret );
+        
+        CL_ERR(clReleaseMemObject(cur_ctx->hashes));
+        cur_ctx->hashes = clCreateBuffer(context, CL_MEM_READ_WRITE, hashes_size, NULL, &ret);
+        CL_ERR( ret );
+        
+        CL_ERR(clReleaseMemObject(cur_ctx->num_hashes_arr));
+        cur_ctx->num_hashes_arr = clCreateBuffer(context, CL_MEM_READ_WRITE, num_hashes_size, NULL, &ret);
+        CL_ERR( ret );
 
         cur_ctx->num_elems_alloc = num_elems;
     }
 
-	CL_ERR( clEnqueueWriteBuffer(cmd_queue, cur_ctx->hashes, CL_TRUE, 0, hashes_size, hashes, 0, NULL, NULL));
-	CL_ERR( clEnqueueWriteBuffer(cmd_queue, cur_ctx->num_hashes_arr, CL_TRUE, 0, num_hashes_size, num_hashes_arr, 0, NULL, NULL));
-	
+    CL_ERR( clEnqueueWriteBuffer(cmd_queue, cur_ctx->hashes, CL_TRUE, 0, hashes_size, hashes, 0, NULL, NULL));
+    CL_ERR( clEnqueueWriteBuffer(cmd_queue, cur_ctx->num_hashes_arr, CL_TRUE, 0, num_hashes_size, num_hashes_arr, 0, NULL, NULL));
+    
     size_t num_blocks = ROUND_UP_DIV(num_elems, OPENCL_LOCAL_WORK_SIZE);
-	size_t num_threads_block = OPENCL_LOCAL_WORK_SIZE;
-	
-	CL_ERR( clSetKernelArg(poh_verify_kernel, 0, sizeof(cl_mem), (void *)&cur_ctx->hashes) );
-	CL_ERR( clSetKernelArg(poh_verify_kernel, 1, sizeof(cl_mem), (void *)&cur_ctx->num_hashes_arr) );
-	CL_ERR( clSetKernelArg(poh_verify_kernel, 2, sizeof(size_t), (void *)&num_elems) );
+    size_t num_threads_block = OPENCL_LOCAL_WORK_SIZE;
+    
+    CL_ERR( clSetKernelArg(poh_verify_kernel, 0, sizeof(cl_mem), (void *)&cur_ctx->hashes) );
+    CL_ERR( clSetKernelArg(poh_verify_kernel, 1, sizeof(cl_mem), (void *)&cur_ctx->num_hashes_arr) );
+    CL_ERR( clSetKernelArg(poh_verify_kernel, 2, sizeof(size_t), (void *)&num_elems) );
 
-	size_t global_size[2] = {num_blocks * num_threads_block, 0};
-	size_t local_size[2] = {num_threads_block, 0};	
-	ret = clEnqueueNDRangeKernel(cmd_queue, poh_verify_kernel, 1, NULL,
-		global_size, local_size, 0, NULL, NULL);
-		CL_ERR( ret );
-	
-	CL_ERR( clEnqueueReadBuffer(cmd_queue, cur_ctx->hashes, CL_TRUE, 0, hashes_size, hashes, 0, NULL, NULL));
+    size_t global_size[2] = {num_blocks * num_threads_block, 0};
+    size_t local_size[2] = {num_threads_block, 0};    
+    ret = clEnqueueNDRangeKernel(cmd_queue, poh_verify_kernel, 1, NULL,
+        global_size, local_size, 0, NULL, NULL);
+        CL_ERR( ret );
+    
+    CL_ERR( clEnqueueReadBuffer(cmd_queue, cur_ctx->hashes, CL_TRUE, 0, hashes_size, hashes, 0, NULL, NULL));
 
     pthread_mutex_unlock(&cur_ctx->mutex);
 

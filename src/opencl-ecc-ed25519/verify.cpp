@@ -1,13 +1,13 @@
 #include "sha512.h"
 #include <algorithm>
 #include <stdio.h>
-#include "ge.cu"
-#include "sc.cu"
-#include "fe.cu"
-#include "seed.cu"
-#include "keypair.cu"
-#include "sign.cu"
-#include "sha512.cu"
+#include "ge.c"
+#include "sc.c"
+#include "fe.c"
+#include "seed.c"
+#include "keypair.c"
+#include "sign.c"
+#include "sha512.c"
 
 #include "ed25519.h"
 #include <pthread.h>
@@ -146,7 +146,7 @@ static bool ed25519_init_locked() {
             }
         }
     }
-	
+    
     return g_total_gpus > 0;
 }
 
@@ -170,10 +170,10 @@ void ed25519_verify_many(const gpu_Elems* elems,
                          uint8_t* out,
                          uint8_t use_non_default_stream)
 {
-	DIE(cl_check_init() == false, "OpenCL could not be init");
+    DIE(cl_check_init() == false, "OpenCL could not be init");
     
     cl_int ret;
-	
+    
     LOG("Starting verify_many: num_elems: %d total_signatures: %d total_packets: %d message_size: %d\n",
         num_elems, total_signatures, total_packets, message_size);
 
@@ -212,96 +212,96 @@ void ed25519_verify_many(const gpu_Elems* elems,
     LOG("cur gpu: %d cur queue: %d\n", cur_gpu, cur_queue);
 
     if (total_packets_len > cur_ctx->total_packets_len) {
-		clReleaseMemObject(cur_ctx->packets);
-		cur_ctx->packets = clCreateBuffer(context, CL_MEM_READ_WRITE, total_packets_len, NULL, &ret);
-		CL_ERR( ret );
+        clReleaseMemObject(cur_ctx->packets);
+        cur_ctx->packets = clCreateBuffer(context, CL_MEM_READ_WRITE, total_packets_len, NULL, &ret);
+        CL_ERR( ret );
 
         cur_ctx->total_packets_len = total_packets_len;
     }
 
     if (cur_ctx->num < total_signatures) {
-		clReleaseMemObject(cur_ctx->out);
-		cur_ctx->out = clCreateBuffer(context, CL_MEM_READ_WRITE, out_size, NULL, &ret);
-		CL_ERR( ret );
+        clReleaseMemObject(cur_ctx->out);
+        cur_ctx->out = clCreateBuffer(context, CL_MEM_READ_WRITE, out_size, NULL, &ret);
+        CL_ERR( ret );
 
         cur_ctx->num = total_signatures;
     }
 
     if (cur_ctx->num_signatures < total_signatures) {
-		
-		clReleaseMemObject(cur_ctx->public_key_offsets);
-		cur_ctx->public_key_offsets = clCreateBuffer(context, CL_MEM_READ_WRITE, offsets_size, NULL, &ret);
-		CL_ERR( ret );
-		
-		clReleaseMemObject(cur_ctx->signature_offsets);
-		cur_ctx->signature_offsets = clCreateBuffer(context, CL_MEM_READ_WRITE, offsets_size, NULL, &ret);
-		CL_ERR( ret );
-		
-		clReleaseMemObject(cur_ctx->message_start_offsets);
-		cur_ctx->message_start_offsets = clCreateBuffer(context, CL_MEM_READ_WRITE, offsets_size, NULL, &ret);
-		CL_ERR( ret );
-		
-		clReleaseMemObject(cur_ctx->message_lens);
-		cur_ctx->message_lens = clCreateBuffer(context, CL_MEM_READ_WRITE, offsets_size, NULL, &ret);
-		CL_ERR( ret );
+        
+        clReleaseMemObject(cur_ctx->public_key_offsets);
+        cur_ctx->public_key_offsets = clCreateBuffer(context, CL_MEM_READ_WRITE, offsets_size, NULL, &ret);
+        CL_ERR( ret );
+        
+        clReleaseMemObject(cur_ctx->signature_offsets);
+        cur_ctx->signature_offsets = clCreateBuffer(context, CL_MEM_READ_WRITE, offsets_size, NULL, &ret);
+        CL_ERR( ret );
+        
+        clReleaseMemObject(cur_ctx->message_start_offsets);
+        cur_ctx->message_start_offsets = clCreateBuffer(context, CL_MEM_READ_WRITE, offsets_size, NULL, &ret);
+        CL_ERR( ret );
+        
+        clReleaseMemObject(cur_ctx->message_lens);
+        cur_ctx->message_lens = clCreateBuffer(context, CL_MEM_READ_WRITE, offsets_size, NULL, &ret);
+        CL_ERR( ret );
 
         cur_ctx->num_signatures = total_signatures;
     }
-	
-	perftime_t start, end;
+    
+    perftime_t start, end;
     get_time(&start);
-	
-	CL_ERR( clEnqueueWriteBuffer(cmd_queue, cur_ctx->public_key_offsets, CL_TRUE, 0, offsets_size, public_key_offsets, 0, NULL, NULL));
-	CL_ERR( clEnqueueWriteBuffer(cmd_queue, cur_ctx->signature_offsets, CL_TRUE, 0, offsets_size, signature_offsets, 0, NULL, NULL));
-	CL_ERR( clEnqueueWriteBuffer(cmd_queue, cur_ctx->message_start_offsets, CL_TRUE, 0, offsets_size, message_start_offsets, 0, NULL, NULL));
-	CL_ERR( clEnqueueWriteBuffer(cmd_queue, cur_ctx->message_lens, CL_TRUE, 0, offsets_size, message_lens, 0, NULL, NULL));
+    
+    CL_ERR( clEnqueueWriteBuffer(cmd_queue, cur_ctx->public_key_offsets, CL_TRUE, 0, offsets_size, public_key_offsets, 0, NULL, NULL));
+    CL_ERR( clEnqueueWriteBuffer(cmd_queue, cur_ctx->signature_offsets, CL_TRUE, 0, offsets_size, signature_offsets, 0, NULL, NULL));
+    CL_ERR( clEnqueueWriteBuffer(cmd_queue, cur_ctx->message_start_offsets, CL_TRUE, 0, offsets_size, message_start_offsets, 0, NULL, NULL));
+    CL_ERR( clEnqueueWriteBuffer(cmd_queue, cur_ctx->message_lens, CL_TRUE, 0, offsets_size, message_lens, 0, NULL, NULL));
 
     size_t cur = 0;
     for (size_t i = 0; i < num_elems; i++) {
         LOG("i: %zu size: %d\n", i, elems[i].num * message_size);
         CL_ERR( clEnqueueWriteBuffer(cmd_queue, cur_ctx->packets, CL_TRUE, cur * message_size, elems[i].num * message_size, elems[i].elems, 0, NULL, NULL));
-		cur += elems[i].num;
+        cur += elems[i].num;
     }
 
     size_t num_threads_per_block = 64;
     size_t num_blocks = ROUND_UP_DIV(total_signatures, num_threads_per_block) * num_threads_per_block;
     LOG("num_blocks: %d threads_per_block: %d keys: %d out: %p\n",
-           num_blocks, num_threads_per_block, (int)total_packets, out);					 
-							 
-	CL_ERR( clSetKernelArg(ed25519_verify_kernel, 0, sizeof(cl_mem), (void *)&cur_ctx->packets) );
-	CL_ERR( clSetKernelArg(ed25519_verify_kernel, 1, sizeof(cl_uint), (void *)&message_size) );
-	CL_ERR( clSetKernelArg(ed25519_verify_kernel, 2, sizeof(cl_mem), (void *)&cur_ctx->message_lens) );
-	CL_ERR( clSetKernelArg(ed25519_verify_kernel, 3, sizeof(cl_mem), (void *)&cur_ctx->public_key_offsets) );
-	CL_ERR( clSetKernelArg(ed25519_verify_kernel, 4, sizeof(cl_mem), (void *)&cur_ctx->signature_offsets) );
-	CL_ERR( clSetKernelArg(ed25519_verify_kernel, 5, sizeof(cl_mem), (void *)&cur_ctx->message_start_offsets) );
-	CL_ERR( clSetKernelArg(ed25519_verify_kernel, 6, sizeof(cl_uint), (void *)&cur_ctx->num_signatures) );
-	CL_ERR( clSetKernelArg(ed25519_verify_kernel, 7, sizeof(cl_mem), (void *)&cur_ctx->out) );
+           num_blocks, num_threads_per_block, (int)total_packets, out);                     
+                             
+    CL_ERR( clSetKernelArg(ed25519_verify_kernel, 0, sizeof(cl_mem), (void *)&cur_ctx->packets) );
+    CL_ERR( clSetKernelArg(ed25519_verify_kernel, 1, sizeof(cl_uint), (void *)&message_size) );
+    CL_ERR( clSetKernelArg(ed25519_verify_kernel, 2, sizeof(cl_mem), (void *)&cur_ctx->message_lens) );
+    CL_ERR( clSetKernelArg(ed25519_verify_kernel, 3, sizeof(cl_mem), (void *)&cur_ctx->public_key_offsets) );
+    CL_ERR( clSetKernelArg(ed25519_verify_kernel, 4, sizeof(cl_mem), (void *)&cur_ctx->signature_offsets) );
+    CL_ERR( clSetKernelArg(ed25519_verify_kernel, 5, sizeof(cl_mem), (void *)&cur_ctx->message_start_offsets) );
+    CL_ERR( clSetKernelArg(ed25519_verify_kernel, 6, sizeof(cl_uint), (void *)&cur_ctx->num_signatures) );
+    CL_ERR( clSetKernelArg(ed25519_verify_kernel, 7, sizeof(cl_mem), (void *)&cur_ctx->out) );
 
-	size_t globalSize[2] = {num_blocks * num_threads_per_block, 0};
-	size_t localSize[2] = {num_threads_per_block, 0};	
-	
-	ret = clEnqueueNDRangeKernel(cmd_queue, ed25519_verify_kernel, 1, NULL,
-		globalSize, localSize, 0, NULL, NULL);
-		CL_ERR( ret );
-		
-	CL_ERR( clEnqueueReadBuffer(cmd_queue, cur_ctx->out, CL_TRUE, 0, out_size, out, 0, NULL, NULL));
+    size_t globalSize[2] = {num_blocks * num_threads_per_block, 0};
+    size_t localSize[2] = {num_threads_per_block, 0};    
+    
+    ret = clEnqueueNDRangeKernel(cmd_queue, ed25519_verify_kernel, 1, NULL,
+        globalSize, localSize, 0, NULL, NULL);
+        CL_ERR( ret );
+        
+    CL_ERR( clEnqueueReadBuffer(cmd_queue, cur_ctx->out, CL_TRUE, 0, out_size, out, 0, NULL, NULL));
 
     pthread_mutex_unlock(&cur_ctx->mutex);
 
-	get_time(&end);
+    get_time(&end);
     LOG("time diff: %f\n", get_diff(&start, &end));
 }
 
 void ed25519_free_gpu_mem() {
-	
-	gpu_ctx* cur_ctx = &g_gpu_ctx[0][0];
-	
-	CL_ERR(clReleaseMemObject(cur_ctx->packets));
-	CL_ERR(clReleaseMemObject(cur_ctx->out));
-	CL_ERR(clReleaseMemObject(cur_ctx->message_lens));
-	CL_ERR(clReleaseMemObject(cur_ctx->public_key_offsets));
-	CL_ERR(clReleaseMemObject(cur_ctx->signature_offsets));
-	CL_ERR(clReleaseMemObject(cur_ctx->message_start_offsets));
+    
+    gpu_ctx* cur_ctx = &g_gpu_ctx[0][0];
+    
+    CL_ERR(clReleaseMemObject(cur_ctx->packets));
+    CL_ERR(clReleaseMemObject(cur_ctx->out));
+    CL_ERR(clReleaseMemObject(cur_ctx->message_lens));
+    CL_ERR(clReleaseMemObject(cur_ctx->public_key_offsets));
+    CL_ERR(clReleaseMemObject(cur_ctx->signature_offsets));
+    CL_ERR(clReleaseMemObject(cur_ctx->message_start_offsets));
 }
 
 // Ensure copyright and license notice is embedded in the binary
@@ -309,14 +309,4 @@ const char* ed25519_license() {
    return "Copyright (c) 2018 Solana Labs, Inc. "
           "Licensed under the Apache License, Version 2.0 "
           "<http://www.apache.org/licenses/LICENSE-2.0>";
-}
-
-int cuda_host_register(void* ptr, size_t size, unsigned int flags) {
-	//return cudaHostRegister(ptr, size, flags);
-	return -1;
-}
-
-int cuda_host_unregister(void* ptr) {
-	//return cudaHostUnregister(ptr);
-	return -1;
 }

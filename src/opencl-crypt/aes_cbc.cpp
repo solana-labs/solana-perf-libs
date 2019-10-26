@@ -21,14 +21,14 @@
 #endif
 
 void AES_cbc_encrypt(
-		const unsigned char *in, 
-		unsigned char *out,
-		size_t length,
-		const AES_KEY *keys,
-		unsigned char *ivec,
-		const int enc)
+        const unsigned char *in, 
+        unsigned char *out,
+        size_t length,
+        const AES_KEY *keys,
+        unsigned char *ivec,
+        const int enc)
 {
-	DIE(cl_check_init() == false, "OpenCL could not be init");
+    DIE(cl_check_init() == false, "OpenCL could not be init");
     
     cl_int ret;
 
@@ -37,7 +37,7 @@ void AES_cbc_encrypt(
     cl_mem keys_device;
     cl_mem ivec_device;
 
-	cl_uint num_keys = 1;
+    cl_uint num_keys = 1;
     cl_uint sample_len = 0;
     cl_mem samples_device;
 
@@ -76,15 +76,15 @@ void AES_cbc_encrypt(
         cl_uint block_i = i * BLOCK_SIZE;
 
 
-		/*
-		__kernel void AES_cbc_encrypt_kernel(
-			__global unsigned char *in,
-			__global unsigned char *out,
-			uint32_t len,
-			__global AES_KEY *key,
-			__global unsigned char *ivec,
-			const int enc)
-		*/
+        /*
+        __kernel void AES_cbc_encrypt_kernel(
+            __global unsigned char *in,
+            __global unsigned char *out,
+            uint32_t len,
+            __global AES_KEY *key,
+            __global unsigned char *ivec,
+            const int enc)
+        */
         CL_ERR( clSetKernelArg(AES_cbc_encrypt_kernel, 0, sizeof(cl_mem), (void *)&in_device) );
         CL_ERR( clSetKernelArg(AES_cbc_encrypt_kernel, 1, sizeof(cl_mem), (void *)&output_device) );
         CL_ERR( clSetKernelArg(AES_cbc_encrypt_kernel, 2, sizeof(cl_uint), (void *)&size) );
@@ -93,14 +93,14 @@ void AES_cbc_encrypt(
         CL_ERR( clSetKernelArg(AES_cbc_encrypt_kernel, 5, sizeof(cl_uint), (void *)&enc) );
 
         size_t globalSize[2] = {num_blocks * num_threads_per_block, 0};
-        size_t localSize[2] = {num_threads_per_block, 0};	
+        size_t localSize[2] = {num_threads_per_block, 0};    
         ret = clEnqueueNDRangeKernel(cmd_queue, AES_cbc_encrypt_kernel, 1, NULL,
             globalSize, localSize, 0, NULL, NULL);
             CL_ERR( ret );
 
         slength -= BLOCK_SIZE;
         in += BLOCK_SIZE;
-		out += BLOCK_SIZE;
+        out += BLOCK_SIZE;
         if (slength <= 0) {
             break;
         }
@@ -169,17 +169,17 @@ void AES_cbc_encrypt_many(const unsigned char *in, unsigned char *out,
         cl_uint block_i = i * BLOCK_SIZE;
 
 
-		/* __kernel void CRYPTO_cbc128_encrypt_kernel(__global unsigned char* input, 
-											__global unsigned char* output,
-											uint32_t length,
-											__global AES_KEY* keys,
-											__global unsigned char* ivec,
-											uint32_t num_keys,
-											__global unsigned char* sha_state,
-											__global uint32_t* sample_idx,
-											uint32_t sample_len,
-											uint32_t block_offset)
-		*/
+        /* __kernel void CRYPTO_cbc128_encrypt_kernel(__global unsigned char* input, 
+                                            __global unsigned char* output,
+                                            uint32_t length,
+                                            __global AES_KEY* keys,
+                                            __global unsigned char* ivec,
+                                            uint32_t num_keys,
+                                            __global unsigned char* sha_state,
+                                            __global uint32_t* sample_idx,
+                                            uint32_t sample_len,
+                                            uint32_t block_offset)
+        */
         CL_ERR( clSetKernelArg(CRYPTO_cbc128_encrypt_kernel, 0, sizeof(cl_mem), (void *)&in_device) );
         CL_ERR( clSetKernelArg(CRYPTO_cbc128_encrypt_kernel, 1, sizeof(cl_mem), (void *)&output_device) );
         CL_ERR( clSetKernelArg(CRYPTO_cbc128_encrypt_kernel, 2, sizeof(cl_uint), (void *)&size) );
@@ -192,7 +192,7 @@ void AES_cbc_encrypt_many(const unsigned char *in, unsigned char *out,
         CL_ERR( clSetKernelArg(CRYPTO_cbc128_encrypt_kernel, 9, sizeof(cl_uint), (void *)&block_i ) );
 
         size_t globalSize[2] = {num_blocks * num_threads_per_block, 0};
-        size_t localSize[2] = {num_threads_per_block, 0};	
+        size_t localSize[2] = {num_threads_per_block, 0};    
         ret = clEnqueueNDRangeKernel(cmd_queue, CRYPTO_cbc128_encrypt_kernel, 1, NULL,
             globalSize, localSize, 0, NULL, NULL);
             CL_ERR( ret );

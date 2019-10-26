@@ -1,17 +1,17 @@
 const char *kernels_aes_cbc_src = R""""(
 
-#define uint64_t	ulong
-#define uint32_t	uint
-#define uint16_t	ushort
-#define uint8_t		uchar
+#define uint64_t    ulong
+#define uint32_t    uint
+#define uint16_t    ushort
+#define uint8_t     uchar
 
-#define int64_t		long
-#define int32_t		int
-#define int16_t		short
-#define int8_t		char
+#define int64_t     long
+#define int32_t     int
+#define int16_t     short
+#define int8_t      char
 
 #ifndef UINT64_C
-#define UINT64_C 	ulong
+#define UINT64_C    ulong
 #endif
 
 #define BLOCK_SIZE (4 * 1024)
@@ -33,7 +33,7 @@ typedef void (*ccm128_f) (const unsigned char *in, unsigned char *out,
                           size_t blocks, const void *key,
                           const unsigned char ivec[16],
                           unsigned char cmac[16]);
-						  
+                          
 typedef struct ocb128_context OCB128_CONTEXT;
 
 typedef void (*ocb128_f) (const unsigned char *in, unsigned char *out,
@@ -914,9 +914,9 @@ __constant u32 rcon[] = {
  * Expand the cipher key into the encryption key schedule.
  */
 __kernel void AES_set_encrypt_key_kernel(
-			__global const unsigned char *userKey,
-			const int bits,
-			__global AES_KEY *key)
+            __global const unsigned char *userKey,
+            const int bits,
+            __global AES_KEY *key)
 {
     __global u32 *rk;
     int i = 0;
@@ -1190,8 +1190,8 @@ int AES_set_decrypt_key(const unsigned char *userKey, const int bits,
  */
 void AES_encrypt(__global unsigned char *in,
                  __global unsigned char *out,
-				 __global AES_KEY *key,
-				 __constant const u32* te) {
+                 __global AES_KEY *key,
+                 __constant const u32* te) {
 
     __global const u32 *rk;
     u32 s0, s1, s2, s3, t0, t1, t2, t3;
@@ -1399,8 +1399,8 @@ void AES_encrypt(__global unsigned char *in,
  * in and out can overlap
  */
 void AES_decrypt_privaddr(__global unsigned char *in, 
-			unsigned char *out,
-			__global AES_KEY *key)
+            unsigned char *out,
+            __global AES_KEY *key)
 {
 
     __global const u32 *rk;
@@ -1592,8 +1592,8 @@ void AES_decrypt_privaddr(__global unsigned char *in,
  * in and out can overlap
  */
 void AES_decrypt(__global unsigned char *in, 
-			__global unsigned char *out,
-			__global AES_KEY *key)
+            __global unsigned char *out,
+            __global AES_KEY *key)
 {
 
     __global const u32 *rk;
@@ -1990,9 +1990,9 @@ int AES_set_decrypt_key(__global unsigned char *userKey, const int bits,
 #endif
 
 void aes_cbc128_encrypt(__global unsigned char* in, __global unsigned char* out,
-						uint32_t len, __global AES_KEY* key,
-						__global unsigned char* ivec,
-						__constant const u32* l_te)
+                        uint32_t len, __global AES_KEY* key,
+                        __global unsigned char* ivec,
+                        __constant const u32* l_te)
 {
     size_t n;
     __global unsigned char *iv = ivec;
@@ -2015,9 +2015,9 @@ void aes_cbc128_encrypt(__global unsigned char* in, __global unsigned char* out,
     } else {
         while (len >= 16) {
             for (n = 0; n < 16; n += sizeof(size_t)) {
-				*(__global size_t *)(out + n) =
+                *(__global size_t *)(out + n) =
                     *(__global size_t *)(in + n) ^ *(__global size_t *)(iv + n);
-			}
+            }
             AES_encrypt(out, out, key, l_te);
             iv = out;
             len -= 16;
@@ -2040,9 +2040,9 @@ void aes_cbc128_encrypt(__global unsigned char* in, __global unsigned char* out,
         out += 16;
     }
     //memcpy(ivec, iv, 16);
-	for(int i = 0; i < 16; i++) {
-		ivec[i] = iv[i];
-	}
+    for(int i = 0; i < 16; i++) {
+        ivec[i] = iv[i];
+    }
 }
 
 /*
@@ -2067,20 +2067,20 @@ void CRYPTO_cbc128_decrypt(__global unsigned char *in, __global unsigned char *o
         if (STRICT_ALIGNMENT &&
             ((size_t)in | (size_t)out | (size_t)ivec) % sizeof(size_t) != 0) {
             while (len >= 16) {
-				
-				// __global to private, use CRYPTO_cbc128_AES_decrypt instead
-				unsigned char out_priv[16];
-				for(int i = 0; i < 16; i++) {
-					out_priv[i] = out[i];
-				}
-				
+                
+                // __global to private, use CRYPTO_cbc128_AES_decrypt instead
+                unsigned char out_priv[16];
+                for(int i = 0; i < 16; i++) {
+                    out_priv[i] = out[i];
+                }
+                
                 (*block) (in, out_priv, key);
-				
-				for(int i = 0; i < 16; i++) {
-					out[i] = out_priv[i];
-				}
-				
-				
+                
+                for(int i = 0; i < 16; i++) {
+                    out[i] = out_priv[i];
+                }
+                
+                
                 for (n = 0; n < 16; ++n)
                     out[n] ^= iv[n];
                 iv = in;
@@ -2092,18 +2092,18 @@ void CRYPTO_cbc128_decrypt(__global unsigned char *in, __global unsigned char *o
             while (len >= 16) {
                 __global size_t *out_t = (__global size_t *)out, *iv_t = (__global size_t *)iv;
 
-				// __global to private, use CRYPTO_cbc128_AES_decrypt instead
-				unsigned char out_priv[16];
-				for(int i = 0; i < 16; i++) {
-					out_priv[i] = out[i];
-				}
+                // __global to private, use CRYPTO_cbc128_AES_decrypt instead
+                unsigned char out_priv[16];
+                for(int i = 0; i < 16; i++) {
+                    out_priv[i] = out[i];
+                }
 
                 (*block) (in, out_priv, key);
-				
-				for(int i = 0; i < 16; i++) {
-					out[i] = out_priv[i];
-				}
-				
+                
+                for(int i = 0; i < 16; i++) {
+                    out[i] = out_priv[i];
+                }
+                
                 for (n = 0; n < 16 / sizeof(size_t); n++)
                     out_t[n] ^= iv_t[n];
                 iv = in;
@@ -2113,9 +2113,9 @@ void CRYPTO_cbc128_decrypt(__global unsigned char *in, __global unsigned char *o
             }
         }
         
-		for(int i = 0; i < 16; i++) {
-			ivec[i] = iv[i];
-		}
+        for(int i = 0; i < 16; i++) {
+            ivec[i] = iv[i];
+        }
     } else {
         if (STRICT_ALIGNMENT &&
             ((size_t)in | (size_t)out | (size_t)ivec) % sizeof(size_t) != 0) {
@@ -2134,7 +2134,7 @@ void CRYPTO_cbc128_decrypt(__global unsigned char *in, __global unsigned char *o
         } else if (16 % sizeof(size_t) == 0) { // always true 
             while (len >= 16) {
                 size_t c;
-				__global size_t *out_t = (__global size_t *)out, *ivec_t = (__global size_t *)ivec;
+                __global size_t *out_t = (__global size_t *)out, *ivec_t = (__global size_t *)ivec;
                 __global const size_t *in_t = (__global const size_t *)in;
 
                 (*block) (in, tmp.c, key);
@@ -2171,11 +2171,11 @@ void CRYPTO_cbc128_decrypt(__global unsigned char *in, __global unsigned char *o
 */
 
 void CRYPTO_cbc128_AES_decrypt(
-			__global unsigned char *in,
-			__global unsigned char *out,
-			size_t len,
-			__global AES_KEY *key,
-			__global unsigned char ivec[16])
+            __global unsigned char *in,
+            __global unsigned char *out,
+            size_t len,
+            __global AES_KEY *key,
+            __global unsigned char ivec[16])
 {
     size_t n;
     union {
@@ -2193,9 +2193,9 @@ void CRYPTO_cbc128_AES_decrypt(
         if (STRICT_ALIGNMENT &&
             ((size_t)in | (size_t)out | (size_t)ivec) % sizeof(size_t) != 0) {
             while (len >= 16) {
-				
+                
                 AES_decrypt(in, out, key);
-				
+                
                 for (n = 0; n < 16; ++n)
                     out[n] ^= iv[n];
                 iv = in;
@@ -2208,7 +2208,7 @@ void CRYPTO_cbc128_AES_decrypt(
                 __global size_t *out_t = (__global size_t *)out, *iv_t = (__global size_t *)iv;
 
                 AES_decrypt(in, out, key);
-				
+                
                 for (n = 0; n < 16 / sizeof(size_t); n++)
                     out_t[n] ^= iv_t[n];
                 iv = in;
@@ -2218,9 +2218,9 @@ void CRYPTO_cbc128_AES_decrypt(
             }
         }
         
-		for(int i = 0; i < 16; i++) {
-			ivec[i] = iv[i];
-		}
+        for(int i = 0; i < 16; i++) {
+            ivec[i] = iv[i];
+        }
     } else {
         if (STRICT_ALIGNMENT &&
             ((size_t)in | (size_t)out | (size_t)ivec) % sizeof(size_t) != 0) {
@@ -2239,7 +2239,7 @@ void CRYPTO_cbc128_AES_decrypt(
         } else if (16 % sizeof(size_t) == 0) { /* always true */
             while (len >= 16) {
                 size_t c;
-				__global size_t *out_t = (__global size_t *)out, *ivec_t = (__global size_t *)ivec;
+                __global size_t *out_t = (__global size_t *)out, *ivec_t = (__global size_t *)ivec;
                 __global const size_t *in_t = (__global const size_t *)in;
 
                 AES_decrypt_privaddr(in, tmp.c, key);
@@ -2276,30 +2276,30 @@ void CRYPTO_cbc128_AES_decrypt(
 
 
 __kernel void AES_cbc_encrypt_kernel(
-		__global unsigned char *in,
-		__global unsigned char *out,
-		uint32_t len,
-		__global AES_KEY *key,
+        __global unsigned char *in,
+        __global unsigned char *out,
+        uint32_t len,
+        __global AES_KEY *key,
         __global unsigned char *ivec,
-		const int enc)
+        const int enc)
 {
     if (enc) {
         aes_cbc128_encrypt(in, out, len, key, ivec, g_Te0);
-	}
+    }
     else
         CRYPTO_cbc128_AES_decrypt(in, out, len, key, ivec);
 }
 
 __kernel void CRYPTO_cbc128_encrypt_kernel(__global unsigned char* input, 
-									__global unsigned char* output,
-									uint32_t length,
-									__global AES_KEY* keys,
-									__global unsigned char* ivec,
-									uint32_t num_keys,
-									__global unsigned char* sha_state,
-									__global uint32_t* sample_idx,
-									uint32_t sample_len,
-									uint32_t block_offset)
+                                    __global unsigned char* output,
+                                    uint32_t length,
+                                    __global AES_KEY* keys,
+                                    __global unsigned char* ivec,
+                                    uint32_t num_keys,
+                                    __global unsigned char* sha_state,
+                                    __global uint32_t* sample_idx,
+                                    uint32_t sample_len,
+                                    uint32_t block_offset)
 {
     uint32_t i = (uint32_t)(get_global_id(0));
 

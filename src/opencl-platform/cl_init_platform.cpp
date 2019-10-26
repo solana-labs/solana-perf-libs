@@ -17,13 +17,13 @@ cl_program program;
 
 //////////////////////////////////////
 
-#define KERNELS_AES_CBC	1
+#define KERNELS_AES_CBC    1
 
-#ifdef	KERNELS_AES_CBC
-	#include "kernels_aes_cbc.h"
+#ifdef    KERNELS_AES_CBC
+    #include "kernels_aes_cbc.h"
 #else
-	const char *kernels_aes_cbc_src = R""""(
-	)"""";
+    const char *kernels_aes_cbc_src = R""""(
+    )"""";
 #endif
 
 cl_kernel CRYPTO_cbc128_encrypt_kernel;
@@ -31,13 +31,13 @@ cl_kernel AES_cbc_encrypt_kernel;
 
 //////////////////////////////////////
 
-#define KERNELS_CHACHA_CBC	1
+#define KERNELS_CHACHA_CBC    1
 
-#if	KERNELS_CHACHA_CBC
-	#include "kernels_chacha_cbc.h"
+#if    KERNELS_CHACHA_CBC
+    #include "kernels_chacha_cbc.h"
 #else
-	const char *kernels_chacha_cbc_src = R""""(
-	)"""";
+    const char *kernels_chacha_cbc_src = R""""(
+    )"""";
 #endif
 
 cl_kernel chacha20_ctr_encrypt_kernel;
@@ -47,16 +47,16 @@ cl_kernel chacha_ctr_encrypt_kernel;
 
 //////////////////////////////////////
 
-#define KERNELS_PRECOMP_DATA	1
+#define KERNELS_PRECOMP_DATA    1
 
-#ifdef	KERNELS_PRECOMP_DATA
-	#include "kernels_precomp_data.h"
-	#include "kernels_verify.h"
+#ifdef    KERNELS_PRECOMP_DATA
+    #include "kernels_precomp_data.h"
+    #include "kernels_verify.h"
 #else
-	const char *kernels_precomp_data_src = R""""(
-	)"""";
-	const char *kernels_verify_src = R""""(
-	)"""";
+    const char *kernels_precomp_data_src = R""""(
+    )"""";
+    const char *kernels_verify_src = R""""(
+    )"""";
 #endif
 
 cl_kernel init_sha256_state_kernel;
@@ -71,12 +71,12 @@ int CL_COMPILE_ERR(int cl_ret,
                   cl_program program,
                   cl_device_id device)
 {
-	if(cl_ret != CL_SUCCESS){
-		cout << endl << cl_get_string_err(cl_ret) << endl;
-		cl_get_compiler_err_log(program, device);
-		return 1;
-	}
-	return 0;
+    if(cl_ret != CL_SUCCESS){
+        cout << endl << cl_get_string_err(cl_ret) << endl;
+        cl_get_compiler_err_log(program, device);
+        return 1;
+    }
+    return 0;
 }
 
 /**
@@ -99,7 +99,7 @@ void read_kernel(string file_name, string &str_kernel)
 */
 const char* cl_get_string_err(cl_int err) {
 switch (err) {
-    case CL_SUCCESS:                     	return  "Success!";
+    case CL_SUCCESS:                         return  "Success!";
     case CL_DEVICE_NOT_FOUND:               return  "Device not found.";
     case CL_DEVICE_NOT_AVAILABLE:           return  "Device not available";
     case CL_COMPILER_NOT_AVAILABLE:         return  "Compiler not available";
@@ -173,39 +173,39 @@ void cl_get_compiler_err_log(cl_program program, cl_device_id device)
 * Check OpenCL init with device selection
 */
 string cl_get_device_type_setup() {
-	
-	switch(query_device_type) {
-		case CL_DEVICE_TYPE_CPU:
-			return "CPU";
-		break;
-		
-		case CL_DEVICE_TYPE_GPU:
-			return "GPU";
-		break;
-		
-		case CL_DEVICE_TYPE_ACCELERATOR:
-			return "ACCELERATOR";
-		break;
-		
-		case CL_DEVICE_TYPE_ALL:
-			return "ALL";
-		break;
-		
-		default:
-			return "ERROR invalid";
-	}
+    
+    switch(query_device_type) {
+        case CL_DEVICE_TYPE_CPU:
+            return "CPU";
+        break;
+        
+        case CL_DEVICE_TYPE_GPU:
+            return "GPU";
+        break;
+        
+        case CL_DEVICE_TYPE_ACCELERATOR:
+            return "ACCELERATOR";
+        break;
+        
+        case CL_DEVICE_TYPE_ALL:
+            return "ALL";
+        break;
+        
+        default:
+            return "ERROR invalid";
+    }
 }
 
 /**
 * Check OpenCL init with device selection
 */
 bool cl_check_init(cl_uint sel_device_type) {
-	
-	if(query_device_type != sel_device_type) {
-		// if device type changed, invalidate init
-		cl_is_init = false;
-		query_device_type = sel_device_type;
-	}
+    
+    if(query_device_type != sel_device_type) {
+        // if device type changed, invalidate init
+        cl_is_init = false;
+        query_device_type = sel_device_type;
+    }
 
     return cl_check_init();
 }
@@ -218,9 +218,9 @@ bool cl_check_init(void) {
     if(cl_is_init == true) {
         return true;
     } else {
-		cout << "OpenCL platform query & init..." << endl;
-		cout << "OpenCL init devices query type: " << cl_get_device_type_setup() << endl;
-	}
+        cout << "OpenCL platform query & init..." << endl;
+        cout << "OpenCL init devices query type: " << cl_get_device_type_setup() << endl;
+    }
 
     int ret;
 
@@ -305,7 +305,6 @@ bool cl_check_init(void) {
             /* select device based on cli arguments */
             string tmpAttrData = attr_data;
             
-            // TODO adjust this to select on certain criteria
             // always select last device of type GPU
             platform = platform_list[platf];
             device = device_list[dev];
@@ -327,19 +326,19 @@ bool cl_check_init(void) {
     cmd_queue = clCreateCommandQueue(context, device, 0, &ret);
     CL_ERR( ret );
 
-	/************************************************
-	* OpenCL kernels aes_cbc_enc/dec
-	*************************************************/
-	
-	const char* kernel_src_cstr = NULL;
-	
+    /************************************************
+    * OpenCL kernels aes_cbc_enc/dec
+    *************************************************/
+    
+    const char* kernel_src_cstr = NULL;
+    
 #ifdef KERNELS_AES_CBC
-	cout << "Compiling aes-cbc kernels" << endl;
+    cout << "Compiling aes-cbc kernels" << endl;
 
     /* retrieve kernel source */
     kernel_src = kernels_aes_cbc_src;
-	
-	kernel_src_cstr = kernel_src.c_str();
+    
+    kernel_src_cstr = kernel_src.c_str();
 
     /* create kernel program from source */
     program = clCreateProgramWithSource(context, 1,
@@ -351,24 +350,24 @@ bool cl_check_init(void) {
     CL_COMPILE_ERR( ret, program, device );
 
     /* create kernel associated to compiled source kernel */
-	CRYPTO_cbc128_encrypt_kernel = clCreateKernel(program, "CRYPTO_cbc128_encrypt_kernel", &ret);
+    CRYPTO_cbc128_encrypt_kernel = clCreateKernel(program, "CRYPTO_cbc128_encrypt_kernel", &ret);
     CL_ERR( ret );
-	
-	AES_cbc_encrypt_kernel = clCreateKernel(program, "AES_cbc_encrypt_kernel", &ret);
+    
+    AES_cbc_encrypt_kernel = clCreateKernel(program, "AES_cbc_encrypt_kernel", &ret);
     CL_ERR( ret );
 #endif
-	
-	/************************************************
-	* OpenCL kernels chacha20_cbc128
-	*************************************************/
-	
+    
+    /************************************************
+    * OpenCL kernels chacha20_cbc128
+    *************************************************/
+    
 #ifdef KERNELS_CHACHA_CBC
-	cout << "Compiling chacha_cbc kernels" << endl;
+    cout << "Compiling chacha_cbc kernels" << endl;
 
-	/* retrieve kernel source */
-	kernel_src = kernels_chacha_cbc_src;
-	
-	kernel_src_cstr = kernel_src.c_str();
+    /* retrieve kernel source */
+    kernel_src = kernels_chacha_cbc_src;
+    
+    kernel_src_cstr = kernel_src.c_str();
 
     /* create kernel program from source */
     program = clCreateProgramWithSource(context, 1,
@@ -378,11 +377,11 @@ bool cl_check_init(void) {
     /* compile the program for the given set of devices */
     ret = clBuildProgram(program, 1, &device, "-DENDIAN_NEUTRAL -DLTC_NO_ASM", NULL, NULL);
     CL_COMPILE_ERR( ret, program, device );
-	
-	chacha20_ctr_encrypt_kernel = clCreateKernel(program, "chacha20_ctr_encrypt_kernel", &ret);
+    
+    chacha20_ctr_encrypt_kernel = clCreateKernel(program, "chacha20_ctr_encrypt_kernel", &ret);
     CL_ERR( ret );
-	
-	chacha20_cbc128_encrypt_kernel = clCreateKernel(program, "chacha20_cbc128_encrypt_kernel", &ret);
+    
+    chacha20_cbc128_encrypt_kernel = clCreateKernel(program, "chacha20_cbc128_encrypt_kernel", &ret);
     CL_ERR( ret );
 
     chacha20_cbc128_encrypt_sample_kernel = clCreateKernel(program, "chacha20_cbc128_encrypt_sample_kernel", &ret);
@@ -390,26 +389,26 @@ bool cl_check_init(void) {
 
     chacha_ctr_encrypt_kernel = clCreateKernel(program, "chacha_ctr_encrypt_kernel", &ret);
     CL_ERR( ret );
-	
-	init_sha256_state_kernel = clCreateKernel(program, "init_sha256_state_kernel", &ret);
+    
+    init_sha256_state_kernel = clCreateKernel(program, "init_sha256_state_kernel", &ret);
     CL_ERR( ret );
 
     end_sha256_state_kernel = clCreateKernel(program, "end_sha256_state_kernel", &ret);
     CL_ERR( ret );
 #endif
-	
-	/************************************************
-	* OpenCL kernels verify
-	*************************************************/
-	
+    
+    /************************************************
+    * OpenCL kernels verify
+    *************************************************/
+    
 #ifdef KERNELS_PRECOMP_DATA
-	cout << "Compiling verify kernels" << endl;
-	
-	/* retrieve kernel source */
-	kernel_src = kernels_precomp_data_src;
-	kernel_src += kernels_verify_src;
-	
-	kernel_src_cstr = kernel_src.c_str();
+    cout << "Compiling verify kernels" << endl;
+    
+    /* retrieve kernel source */
+    kernel_src = kernels_precomp_data_src;
+    kernel_src += kernels_verify_src;
+    
+    kernel_src_cstr = kernel_src.c_str();
 
     /* create kernel program from source */
     program = clCreateProgramWithSource(context, 1,
@@ -419,11 +418,11 @@ bool cl_check_init(void) {
     /* compile the program for the given set of devices */
     ret = clBuildProgram(program, 1, &device, "-DENDIAN_NEUTRAL -DLTC_NO_ASM", NULL, NULL);
     CL_COMPILE_ERR( ret, program, device );
-	
-	ed25519_verify_kernel = clCreateKernel(program, "ed25519_verify_kernel", &ret);
+    
+    ed25519_verify_kernel = clCreateKernel(program, "ed25519_verify_kernel", &ret);
     CL_ERR( ret );
-	
-	poh_verify_kernel = clCreateKernel(program, "poh_verify_kernel", &ret);
+    
+    poh_verify_kernel = clCreateKernel(program, "poh_verify_kernel", &ret);
     CL_ERR( ret );
 #endif
 

@@ -1,8 +1,6 @@
 #ifndef ED25519_H
 #define ED25519_H
 
-#include "cuda_cl.h"
-
 #include <stddef.h>
 #include <inttypes.h>
 

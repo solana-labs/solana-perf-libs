@@ -61,7 +61,7 @@ void ge_p3_to_p2(ge_p2 *r, const ge_p3 *p);
  */
  
 #ifndef NULL
-#define NULL	0
+#define NULL    0
 #endif
 
 typedef uint64_t ulong64;
@@ -507,12 +507,12 @@ static inline ulong64 ROR64(ulong64 word, int i)
 #endif
 
 void memcpy(char *dst, char *src, size_t n) {
-	for(size_t i = 0; i < n; i++) {
-		dst[i] = src[i];
-	}
+    for(size_t i = 0; i < n; i++) {
+        dst[i] = src[i];
+    }
 }
 
-#define XMEMCPY		memcpy
+#define XMEMCPY        memcpy
 
 /* a simple macro for making hash "process" functions */
 #define HASH_PROCESS(func_name, compress_name, state_var, block_size)                       \
@@ -608,7 +608,7 @@ static __constant ulong32 K[64] = {
 #define Ch(x,y,z)       (z ^ (x & (y ^ z)))
 #define Maj(x,y,z)      (((x | y) & z) | (x & y))
 #define S(x, n)         ROR64c((x),(n))
-#define R(x, n)       	(((((ulong)x) & ((ulong)0xFFFFFFFFFFFFFFFFUL))) >> ((ulong)n))
+#define R(x, n)           (((((ulong)x) & ((ulong)0xFFFFFFFFFFFFFFFFUL))) >> ((ulong)n))
 #define Sigma0(x)       (S(x, 28) ^ S(x, 34) ^ S(x, 39))
 #define Sigma1(x)       (S(x, 14) ^ S(x, 18) ^ S(x, 41))
 #define Gamma0(x)       (S(x, 1) ^ S(x, 8) ^ R(x, 7))
@@ -1006,7 +1006,7 @@ static int sha512_compress(sha512_context *md, unsigned char *buf)
 {
     uint64_t S[8], W[80], t0, t1;
     int i;
-	
+    
     /* copy state into S */
     for (i = 0; i < 8; i++) {
         S[i] = md->state[i];
@@ -2172,7 +2172,7 @@ B is the Ed25519 base point (x,4/5) with x positive.
 void ge_double_scalarmult_vartime(ge_p2 *r, const unsigned char *a, const ge_p3 *A, const unsigned char *b) {
     signed char aslide[256];
     signed char bslide[256];
-	
+    
     ge_cached Ai[8]; /* A,3A,5A,7A,9A,11A,13A,15A */
     ge_p1p1 t;
     ge_p3 u;
@@ -2225,13 +2225,11 @@ void ge_double_scalarmult_vartime(ge_p2 *r, const unsigned char *a, const ge_p3 
 
         if (bslide[i] > 0) {
             ge_p1p1_to_p3(&u, &t);
-			// TODO check fixed OpenCL constant=>priv
-			ge_precomp Bi_priv = Bi[bslide[i] / 2];
+            ge_precomp Bi_priv = Bi[bslide[i] / 2];
             ge_madd(&t, &u, &Bi_priv);
         } else if (bslide[i] < 0) {
             ge_p1p1_to_p3(&u, &t);
-			// TODO check fixed OpenCL constant=>priv
-			ge_precomp Bi_priv = Bi[(-bslide[i]) / 2];
+            ge_precomp Bi_priv = Bi[(-bslide[i]) / 2];
             ge_msub(&t, &u, &Bi_priv);
         }
 
@@ -2248,14 +2246,14 @@ __constant fe sqrtm1 = {
 };
 
 int ge_frombytes_negate_vartime(ge_p3 *h, const unsigned char *s) {
-	// OpenCL fix
-	fe priv_d = {
+    // OpenCL fix
+    fe priv_d = {
     -10913610, 13857413, -15372611, 6949391, 114729, -8787816, -6275908, -3247719, -18696448, -12055116
 };
-	fe priv_sqrtm1 = {
+    fe priv_sqrtm1 = {
     -32595792, -7943725, 9377950, 3500415, 12389472, -272473, -25146209, -2005654, 326686, 11406482
 };
-	
+    
     fe u;
     fe v;
     fe v3;
@@ -2421,12 +2419,12 @@ void ge_p3_to_cached(ge_cached *r, const ge_p3 *p) {
     fe_sub(r->YminusX, p->Y, p->X);
     fe_copy(r->Z, p->Z);
     // check fix OpenCL
-	fe d2_priv;
-	for(int i=0; i<10; i++) {
-		d2_priv[i] = d2[i];
-	}
-	
-	fe_mul(r->T2d, p->T, d2_priv);
+    fe d2_priv;
+    for(int i=0; i<10; i++) {
+        d2_priv[i] = d2[i];
+    }
+    
+    fe_mul(r->T2d, p->T, d2_priv);
 }
 
 
@@ -2475,7 +2473,6 @@ static void cmov(const ge_precomp *t, const ge_precomp *u, unsigned char b) {
     fe_cmov(t->xy2d, u->xy2d, b);
 }
 
-// TODO fix naming OpenCL
 static void select_func(const ge_precomp *t, int pos, signed char b) {
     ge_precomp minust;
     unsigned char bnegative = negative(b);
@@ -2483,25 +2480,13 @@ static void select_func(const ge_precomp *t, int pos, signed char b) {
     fe_1(t->yplusx);
     fe_1(t->yminusx);
     fe_0(t->xy2d);
-	
-	/*
-	//  OpenCL check fix
-	cmov(t, &base_priv[1], equal(babs, 2));
-    cmov(t, &base_priv[1], equal(babs, 2));
-    cmov(t, &base_priv[2], equal(babs, 3));
-    cmov(t, &base_priv[3], equal(babs, 4));
-    cmov(t, &base_priv[4], equal(babs, 5));
-    cmov(t, &base_priv[5], equal(babs, 6));
-    cmov(t, &base_priv[6], equal(babs, 7));
-    cmov(t, &base_priv[7], equal(babs, 8));
-	*/
-	
-	ge_precomp base_priv;
-	for(int i = 0; i < 8; i++) {
-		base_priv = base[pos][i];
-		cmov(t, &base_priv, equal(babs, i + 1));
-	}
-	
+
+    ge_precomp base_priv;
+    for(int i = 0; i < 8; i++) {
+        base_priv = base[pos][i];
+        cmov(t, &base_priv, equal(babs, i + 1));
+    }
+
     fe_copy(minust.yplusx, t->yminusx);
     fe_copy(minust.yminusx, t->yplusx);
     fe_neg(minust.xy2d, t->xy2d);
@@ -2546,9 +2531,7 @@ void ge_scalarmult_base(ge_p3 *h, const unsigned char *a) {
     ge_p3_0(h);
 
     for (i = 1; i < 64; i += 2) {
-		// TODO fixme OpenCL overloadable / private to global
         select_func(&t, i / 2, e[i]);
-		// fix address space private to global
         ge_madd(&r, h, &t);
         ge_p1p1_to_p3(h, &r);
     }
@@ -2563,9 +2546,7 @@ void ge_scalarmult_base(ge_p3 *h, const unsigned char *a) {
     ge_p1p1_to_p3(h, &r);
 
     for (i = 0; i < 64; i += 2) {
-		// TODO fixme OpenCL overloadable
         select_func(&t, i / 2, e[i]);
-		// fix address space private to global
         ge_madd(&r, h, &t);
         ge_p1p1_to_p3(h, &r);
     }
@@ -4122,33 +4103,33 @@ ed25519_verify_device(__global const unsigned char *signature,
     if (signature[63] & 224) {
         return 0;
     }
-	
-	unsigned char public_key_priv[32];
-	for(int i=0; i<32; i++) {
-		public_key_priv[i] = public_key[i];
-	}
+    
+    unsigned char public_key_priv[32];
+    for(int i=0; i<32; i++) {
+        public_key_priv[i] = public_key[i];
+    }
 
     if (ge_frombytes_negate_vartime(&A, public_key_priv) != 0) {
         return 0;
     }
-	
+    
     sha512_init(&hash);
     sha512_update(&hash, signature, 32);
     sha512_update(&hash, public_key, 32);
     sha512_update(&hash, message, message_len);
     sha512_final(&hash, h);
-	
-	unsigned char signature_priv[64];
-	for(int i=0; i<64; i++) {
-		signature_priv[i] = signature[i];
-	}
+    
+    unsigned char signature_priv[64];
+    for(int i=0; i<64; i++) {
+        signature_priv[i] = signature[i];
+    }
     
     sc_reduce(h);
     ge_double_scalarmult_vartime(&R, h, &A, signature_priv + 32);
     ge_tobytes(checker, &R);
 
     if (!consttime_equal(checker, signature_priv)) {
-		return 0;
+        return 0;
     }
 
     return 1;
@@ -4188,32 +4169,30 @@ __kernel void ed25519_verify_kernel(__global const uint8_t* packets,
 #define SHA256_BLOCK_SIZE 32
 
 __kernel void poh_verify_kernel(__global uint8_t* hashes, 
-	__global uint64_t* num_hashes_arr, 
-	uint32_t num_elems) {
+    __global uint64_t* num_hashes_arr, 
+    uint32_t num_elems) {
     uint32_t idx = get_global_id(0);
     if (idx >= num_elems) return;
 
     uint8_t hash[SHA256_BLOCK_SIZE];
 
-	// memcpy(hash, &hashes[idx * SHA256_BLOCK_SIZE], SHA256_BLOCK_SIZE);
-	for(int i = 0; i < SHA256_BLOCK_SIZE; i++) {
-		hash[i] = hashes[idx * SHA256_BLOCK_SIZE + i];
-	}
+    // memcpy(hash, &hashes[idx * SHA256_BLOCK_SIZE], SHA256_BLOCK_SIZE);
+    for(int i = 0; i < SHA256_BLOCK_SIZE; i++) {
+        hash[i] = hashes[idx * SHA256_BLOCK_SIZE + i];
+    }
     
 
     for (size_t i = 0; i < num_hashes_arr[idx]; i++) {
-		//FIXME OpenCL
         hash_state sha_state;
         sha256_init(&sha_state);
         sha256_process(&sha_state, hash, SHA256_BLOCK_SIZE);
         sha256_done(&sha_state, hash);
-		//
     }
 
     //memcpy(&hashes[idx * SHA256_BLOCK_SIZE], hash, SHA256_BLOCK_SIZE);
-	for(int i = 0; i < SHA256_BLOCK_SIZE; i++) {
-		hashes[idx * SHA256_BLOCK_SIZE + i] = hash[i];
-	}
+    for(int i = 0; i < SHA256_BLOCK_SIZE; i++) {
+        hashes[idx * SHA256_BLOCK_SIZE + i] = hash[i];
+    }
 }
 
 )"""";

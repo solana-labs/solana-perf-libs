@@ -1,17 +1,17 @@
 const char *kernels_chacha_cbc_src = R""""(
 
-#define uint64_t	ulong
-#define uint32_t	uint
-#define uint16_t	ushort
-#define uint8_t		uchar
+#define uint64_t    ulong
+#define uint32_t    uint
+#define uint16_t    ushort
+#define uint8_t     uchar
 
-#define int64_t		long
-#define int32_t		int
-#define int16_t		short
-#define int8_t		char
+#define int64_t     long
+#define int32_t     int
+#define int16_t     short
+#define int8_t      char
 
 #ifndef UINT64_C
-#define UINT64_C 	ulong
+#define UINT64_C    ulong
 #endif
 
 #define ROUND_UP_DIV(x, y)f (((x) + (y) - 1) / (y))
@@ -527,10 +527,10 @@ static void  chacha20_encrypt_priv(const u32 input[16],
     u32 x[16];
     int i;
     //memcpy(x, input, sizeof(u32) * 16);
-	for(int i = 0; i < 16; i++) {
-		x[i] = input[i];
-	}
-	
+    for(int i = 0; i < 16; i++) {
+        x[i] = input[i];
+    }
+    
     for (i = num_rounds; i > 0; i -= 2) {
         QUARTERROUND( 0, 4, 8,12)
         QUARTERROUND( 1, 5, 9,13)
@@ -556,10 +556,10 @@ static void  chacha20_encrypt(__global const u32 input[16],
     u32 x[16];
     int i;
     //memcpy(x, input, sizeof(u32) * 16);
-	for(int i = 0; i < 16; i++) {
-		x[i] = input[i];
-	}
-	
+    for(int i = 0; i < 16; i++) {
+        x[i] = input[i];
+    }
+    
     for (i = num_rounds; i > 0; i -= 2) {
         QUARTERROUND( 0, 4, 8,12)
         QUARTERROUND( 1, 5, 9,13)
@@ -579,12 +579,12 @@ static void  chacha20_encrypt(__global const u32 input[16],
 }
 
 __kernel void chacha20_ctr_encrypt_kernel(
-				__global const uint8_t *in, 
-				__global uint8_t *out, 
-				uint32_t in_len,
-				__global const uint8_t key[CHACHA_KEY_SIZE],
-				__global const uint8_t nonce[CHACHA_NONCE_SIZE],
-				uint32_t counter)
+                __global const uint8_t *in, 
+                __global uint8_t *out, 
+                uint32_t in_len,
+                __global const uint8_t key[CHACHA_KEY_SIZE],
+                __global const uint8_t nonce[CHACHA_NONCE_SIZE],
+                uint32_t counter)
 {
   uint32_t input[16];
   uint8_t buf[64];
@@ -630,11 +630,11 @@ __kernel void chacha20_ctr_encrypt_kernel(
 }
 
 void chacha20_ctr_encrypt(__global const uint8_t *in, 
-				__global uint8_t *out, 
-				size_t in_len,
-				__global const uint8_t key[CHACHA_KEY_SIZE],
-				__global const uint8_t nonce[CHACHA_NONCE_SIZE],
-				uint32_t counter)
+                __global uint8_t *out, 
+                size_t in_len,
+                __global const uint8_t key[CHACHA_KEY_SIZE],
+                __global const uint8_t nonce[CHACHA_NONCE_SIZE],
+                uint32_t counter)
 {
   uint32_t input[16];
   uint8_t buf[64];
@@ -742,32 +742,25 @@ void cuda_chacha20_cbc128_encrypt(__global const unsigned char* in, __global uns
         in += CHACHA_BLOCK_SIZE;
         out += CHACHA_BLOCK_SIZE;
     }
-	
-	for(int i = 0; i < CHACHA_BLOCK_SIZE; i++) {
-		ivec[i] = iv[i];
-	}
+    
+    for(int i = 0; i < CHACHA_BLOCK_SIZE; i++) {
+        ivec[i] = iv[i];
+    }
 }
 
 void cuda_chacha20_cbc_encrypt(__global const uint8_t *in, __global uint8_t *out, size_t in_len,
                                __global const uint8_t key[CHACHA_KEY_SIZE], __global uint8_t* ivec)
 {
-	// TODO optimize OpenCL
-	/*
-	uint8_t key_priv[CHACHA_KEY_SIZE];
-	for(int i = 0; i < CHACHA_KEY_SIZE; i++) {
-		key_priv[i] = key[i];
-	} */
-	
     cuda_chacha20_cbc128_encrypt(in, out, in_len, key, ivec);
 }
 
 __kernel void chacha20_cbc128_encrypt_kernel(
-					__global const unsigned char* input, 
-					__global unsigned char* output,
+                    __global const unsigned char* input, 
+                    __global unsigned char* output,
                     uint32_t length,
-					__global const uint8_t* keys,
-					__global unsigned char* ivec,
-					uint32_t num_keys)
+                    __global const uint8_t* keys,
+                    __global unsigned char* ivec,
+                    uint32_t num_keys)
 {
     size_t i = (size_t)(get_global_id(0));
 
@@ -1502,9 +1495,9 @@ inline int  sha256_done(__global hash_state * md, __global unsigned char *out)
 }
 
 static int sha256_process (
-			__global hash_state * md, 
-			__global const unsigned char *in, 
-			unsigned long inlen)
+            __global hash_state * md, 
+            __global const unsigned char *in, 
+            unsigned long inlen)
 {
     unsigned long n;
     int           err;
@@ -1525,12 +1518,12 @@ static int sha256_process (
         } else {
            n = MIN(inlen, (64 - md-> sha256.curlen));
            
-		   // XMEMCPY(md->sha256.buf + md->sha256.curlen, in, (size_t)n);
-		   __global unsigned char *buf = md->sha256.buf + md->sha256.curlen;
-		   for(int i = 0; i < n; i++) {
-				buf[i] = in[i];
-		   }
-		   
+           // XMEMCPY(md->sha256.buf + md->sha256.curlen, in, (size_t)n);
+           __global unsigned char *buf = md->sha256.buf + md->sha256.curlen;
+           for(int i = 0; i < n; i++) {
+                buf[i] = in[i];
+           }
+           
            md-> sha256.curlen += n;
            in             += n;
            inlen          -= n;
@@ -1628,14 +1621,13 @@ __kernel void chacha20_cbc128_encrypt_sample_kernel(__global const uint8_t* inpu
     size_t i = (size_t)(get_global_id(0));
 
     if (i < num_keys) {
-		// TODO OpenCL check
         __global uint8_t* t_output = &output[i * BLOCK_SIZE];
         cuda_chacha20_cbc128_encrypt(input, &output[i * BLOCK_SIZE], length, &keys[i * CHACHA_KEY_SIZE], &ivec[i * CHACHA_BLOCK_SIZE]);
 
         for (uint32_t j = 0; j < sample_len; j++) {
             uint64_t cur_sample = sample_idx[j] * SAMPLE_SIZE;
             if (cur_sample >= block_offset && cur_sample < (block_offset + length)) {
-				sha256_process(&sha_state[i], &t_output[cur_sample - block_offset], SAMPLE_SIZE);
+                sha256_process(&sha_state[i], &t_output[cur_sample - block_offset], SAMPLE_SIZE);
             }
         }
     }
@@ -1643,12 +1635,12 @@ __kernel void chacha20_cbc128_encrypt_sample_kernel(__global const uint8_t* inpu
 
 
 __kernel void chacha_ctr_encrypt_kernel(__global const unsigned char* input, __global unsigned char* output,
-                                          uint32_t length, __global const uint8_t* keys,
-                                          __global unsigned char* nonces, uint32_t num_keys,
-                                          __global unsigned char* sha_state,
-                                          __global uint32_t* sample_idx,
-                                          uint32_t sample_len,
-                                          uint32_t block_offset)
+                                        uint32_t length, __global const uint8_t* keys,
+                                        __global unsigned char* nonces, uint32_t num_keys,
+                                        __global unsigned char* sha_state,
+                                        __global uint32_t* sample_idx,
+                                        uint32_t sample_len,
+                                        uint32_t block_offset)
 {
     uint32_t i = (uint32_t)(get_global_id(0));
 

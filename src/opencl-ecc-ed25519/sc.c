@@ -1,6 +1,6 @@
 #include "fixedint.h"
 #include "sc.h"
-#include "common.cu"
+#include "common.c"
 
 /*
 Input:
@@ -12,7 +12,7 @@ Output:
   Overwrites s in place.
 */
 
-void __host__ __device__ sc_reduce(unsigned char *s) {
+void sc_reduce(unsigned char *s) {
     int64_t s0 = 2097151 & load_3(s);
     int64_t s1 = 2097151 & (load_4(s + 2) >> 5);
     int64_t s2 = 2097151 & (load_3(s + 5) >> 2);

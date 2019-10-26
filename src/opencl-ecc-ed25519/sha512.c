@@ -16,13 +16,7 @@
 #define UINT64_C uint64_t
 #endif
 
-#ifdef __CUDA_ARCH__
-#define K_DEF __device__
-#else
-#define K_DEF
-#endif
-
-static const uint64_t K_DEF K[80] = {
+static const uint64_t K[80] = {
     UINT64_C(0x428a2f98d728ae22), UINT64_C(0x7137449123ef65cd),
     UINT64_C(0xb5c0fbcfec4d3b2f), UINT64_C(0xe9b5dba58189dbbc),
     UINT64_C(0x3956c25bf348b538), UINT64_C(0x59f111f1b605d019),
@@ -97,7 +91,7 @@ static const uint64_t K_DEF K[80] = {
 #endif
 
 /* compress 1024-bits */
-static int __device__ __host__ sha512_compress(sha512_context *md, unsigned char *buf)
+static int sha512_compress(sha512_context *md, unsigned char *buf)
 {
     uint64_t S[8], W[80], t0, t1;
     int i;
@@ -137,8 +131,6 @@ static int __device__ __host__ sha512_compress(sha512_context *md, unsigned char
 
    #undef RND
 
-
-
     /* feedback */
     for (i = 0; i < 8; i++) {
         md->state[i] = md->state[i] + S[i];
@@ -153,7 +145,7 @@ static int __device__ __host__ sha512_compress(sha512_context *md, unsigned char
    @param md   The hash state you wish to initialize
    @return 0 if successful
 */
-int __device__ __host__ sha512_init(sha512_context * md) {
+int sha512_init(sha512_context * md) {
     if (md == NULL) return 1;
 
     md->curlen = 0;
