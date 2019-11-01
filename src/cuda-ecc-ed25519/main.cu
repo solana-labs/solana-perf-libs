@@ -34,6 +34,7 @@ void print_dwords(unsigned char* ptr, int size) {
 typedef struct {
     uint8_t signature[SIG_SIZE];
     uint8_t public_key[PUB_KEY_SIZE];
+    uint8_t private_key[PRIV_KEY_SIZE];
     uint32_t message_len;
     uint8_t message[8];
 } packet_t;
@@ -45,6 +46,7 @@ typedef struct {
     uint32_t total_signatures;
     uint32_t* message_lens;
     uint32_t* public_key_offsets;
+    uint32_t* private_key_offsets;
     uint32_t* signature_offsets;
     uint32_t* message_start_offsets;
     uint8_t* out_h;
@@ -151,9 +153,8 @@ int main(int argc, const char* argv[]) {
 
     // Host allocate
     unsigned char* seed_h = (unsigned char*)calloc(num_signatures_per_elem * SEED_SIZE, sizeof(uint32_t));
-    unsigned char* private_key_h = (unsigned char*)calloc(num_signatures_per_elem, PRIV_KEY_SIZE);
     unsigned char message_h[] = "abcd1234";
-    int message_h_len = strlen((char*)message_h);
+    uint32_t message_h_len = strlen((char*)message_h);
 
     uint32_t total_signatures = num_elems * num_signatures_per_elem;
 
@@ -169,10 +170,14 @@ int main(int argc, const char* argv[]) {
     uint32_t* message_start_offsets = NULL;
     ed25519_alloc(&message_start_offsets, total_signatures);
 
+    uint32_t* private_key_offsets = NULL;
+    ed25519_alloc(&private_key_offsets, total_signatures);
+
     for (uint32_t i = 0; i < total_signatures; i++) {
         uint32_t base_offset = i * sizeof(streamer_Packet);
         signature_offsets[i] = base_offset + offsetof(packet_t, signature);
         public_key_offsets[i] = base_offset + offsetof(packet_t, public_key);
+        private_key_offsets[i] = base_offset + offsetof(packet_t, private_key);
         message_start_offsets[i] = base_offset + offsetof(packet_t, message);
         message_lens[i] = message_h_len;
     }
@@ -181,6 +186,7 @@ int main(int argc, const char* argv[]) {
         vctx[i].message_lens = message_lens;
         vctx[i].signature_offsets = signature_offsets;
         vctx[i].public_key_offsets = public_key_offsets;
+        vctx[i].private_key_offsets = private_key_offsets;
         vctx[i].message_start_offsets = message_start_offsets;
         vctx[i].num_iterations = num_iterations;
         vctx[i].use_non_default_stream = use_non_default_stream;
@@ -199,18 +205,10 @@ int main(int argc, const char* argv[]) {
         total_packets += num_signatures_per_elem;
     }
 
-    LOG("initing signatures..\n");
+    LOG("initing messages..\n");
     for (int i = 0; i < num_signatures_per_elem; i++) {
         packet_t* packet = (packet_t*)packets_h[i].data;
         memcpy(packet->message, message_h, message_h_len);
-
-        LOG("message_len: %d\n",
-            message_h_len);
-    }
-
-    for (uint32_t i = 0; i < total_signatures; i++) {
-        LOG("sig_offset: %d pub_key_offset: %d message_start_offset: %d message_len: %d\n",
-            signature_offsets[i], public_key_offsets[i], message_start_offsets[i], message_lens[i]);
     }
 
     int out_size = total_signatures * sizeof(uint8_t);
@@ -222,42 +220,88 @@ int main(int argc, const char* argv[]) {
         vctx[i].total_packets = total_packets;
     }
 
-    LOG("creating seed..\n");
-    int ret = ed25519_create_seed(seed_h);
-    LOG("create_seed: %d\n", ret);
-    packet_t* first_packet_h = (packet_t*)packets_h[0].data;
-    ed25519_create_keypair(first_packet_h->public_key, private_key_h, seed_h);
-    ed25519_sign(first_packet_h->signature, first_packet_h->message, message_h_len, first_packet_h->public_key, private_key_h);
-    ret = ed25519_verify(first_packet_h->signature, message_h, message_h_len, first_packet_h->public_key);
-    LOG("verify: %d\n", ret);
+    LOG("creating %d keypairs..\n", num_signatures_per_elem);
+    int num_keypairs_to_create = std::min(100, num_signatures_per_elem);
+    uint8_t* public_keys = (uint8_t*)calloc(num_keypairs_to_create, PUB_KEY_SIZE);
+    uint8_t* private_keys = (uint8_t*)calloc(num_keypairs_to_create, PRIV_KEY_SIZE);
+    for (int i = 0; i < num_keypairs_to_create; i++) {
+        int ret = ed25519_create_seed(seed_h);
+        if (ret != 0) {
+            fprintf(stderr, "Invalid seed!");
+            exit(1);
+        }
 
-    for (int i = 1; i < num_signatures_per_elem; i++) {
-        packet_t* packet_h = (packet_t*)packets_h[i].data;
-        memcpy(packet_h->signature, first_packet_h->signature, SIG_SIZE);
-        memcpy(packet_h->public_key, first_packet_h->public_key, PUB_KEY_SIZE);
+        ed25519_create_keypair(&public_keys[PUB_KEY_SIZE * i], &private_keys[PRIV_KEY_SIZE * i], seed_h);
     }
 
-    for (int i = 0; i < num_signatures_per_elem; i++ ) {
-        packet_t* packet_h = (packet_t*)packets_h[i].data;
-        unsigned char* sig_ptr = packet_h->signature;
-        unsigned char* messages_ptr = packet_h->message;
-        LOG("sig:");
-        print_dwords(sig_ptr, SIG_SIZE);
-        LOG("\nmessage: ");
-        print_dwords(messages_ptr, message_h_len);
-        LOG("\n\n");
+    for (int i = 0; i < num_signatures_per_elem; i++) {
+        packet_t* packet = (packet_t*)packets_h[i].data;
+        int j = rand() % num_keypairs_to_create;
+        memcpy(packet->public_key, &public_keys[j * PUB_KEY_SIZE], PUB_KEY_SIZE);
+        memcpy(packet->private_key, &private_keys[j * PRIV_KEY_SIZE], PRIV_KEY_SIZE);
     }
-    LOG("\n");
+
+    free(public_keys);
+    free(private_keys);
+
+    uint8_t* signatures_h = (uint8_t*)calloc(SIG_SIZE, total_signatures);
+
+    perftime_t start, end;
+    get_time(&start);
+
+    ed25519_sign_many(&vctx[0].elems_h[0],
+                      vctx[0].num_elems,
+                      sizeof(streamer_Packet),
+                      vctx[0].total_packets,
+                      vctx[0].total_signatures,
+                      vctx[0].message_lens,
+                      vctx[0].public_key_offsets,
+                      vctx[0].private_key_offsets,
+                      vctx[0].message_start_offsets,
+                      signatures_h,
+                      1);
+    get_time(&end);
+
+    double diff = get_diff(&start, &end);
+    printf("time diff: %f total: %d signs/sec: %f\n",
+           diff,
+           vctx[0].total_signatures,
+           (double)vctx[0].total_signatures / (diff / 1e6));
+
+    for (int i = 0; i < num_signatures_per_elem; i++) {
+        packet_t* packet_h = (packet_t*)packets_h[i].data;
+        memcpy(packet_h->signature, &signatures_h[i * SIG_SIZE], SIG_SIZE);
+    }
+    free(signatures_h);
+
+    int num_sigs_to_check = std::min(100, num_signatures_per_elem);
+    LOG("checking %d signatures\n", num_sigs_to_check);
+    for (int i = 0; i < num_sigs_to_check; i++) {
+        int j = rand() % num_signatures_per_elem;
+        packet_t* packet = (packet_t*)packets_h[j].data;
+
+        uint8_t signature[SIG_SIZE];
+        ed25519_sign(signature, message_h, message_h_len, packet->public_key, packet->private_key);
+        if (0 != memcmp(packet->signature, signature, SIG_SIZE)) {
+            fprintf(stderr, "Invalid signature!\n");
+            exit(1);
+        }
+
+        int ret = ed25519_verify(packet->signature, message_h, message_h_len, packet->public_key);
+        if (ret != 1) {
+            fprintf(stderr, "Invalid signature!\n");
+            exit(1);
+        }
+    }
 
     std::vector<pthread_t> threads = std::vector<pthread_t>(num_threads);
     pthread_attr_t attr;
-    ret = pthread_attr_init(&attr);
+    int ret = pthread_attr_init(&attr);
     if (ret != 0) {
         LOG("ERROR: pthread_attr_init: %d\n", ret);
         return 1;
     }
 
-    perftime_t start, end;
     get_time(&start);
     for (int i = 0; i < num_threads; i++) {
         ret = pthread_create(&threads[i],
@@ -281,8 +325,8 @@ int main(int argc, const char* argv[]) {
     get_time(&end);
 
     int total = (num_threads * total_signatures * num_iterations);
-    double diff = get_diff(&start, &end);
-    printf("time diff: %f total: %d sigs/sec: %f\n",
+    diff = get_diff(&start, &end);
+    printf("time diff: %f total: %d verifies/sec: %f\n",
            diff,
            total,
            (double)total / (diff / 1e6));
@@ -291,7 +335,6 @@ int main(int argc, const char* argv[]) {
         LOG("ret:\n");
         bool verify_failed = false;
         for (int i = 0; i < out_size / (int)sizeof(uint8_t); i++) {
-            LOG("%x ", vctx[thread].out_h[i]);
             if (vctx[thread].out_h[i] != 1) {
                 verify_failed = true;
             }
@@ -306,12 +349,12 @@ int main(int argc, const char* argv[]) {
     ed25519_free(message_lens);
     ed25519_free(signature_offsets);
     ed25519_free(public_key_offsets);
+    ed25519_free(private_key_offsets);
     ed25519_free(message_start_offsets);
     for (int thread = 0; thread < num_threads; thread++) {
         ed25519_free(vctx[thread].out_h);
     }
     free(seed_h);
-    free(private_key_h);
     ed25519_free_gpu_mem();
     return 0;
 }

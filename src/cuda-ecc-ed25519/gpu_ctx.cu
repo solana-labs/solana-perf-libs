@@ -46,7 +46,7 @@ bool ed25519_init() {
 gpu_ctx_t* get_gpu_ctx() {
     int32_t cur_gpu, cur_queue;
 
-    LOG("locking global mutex");
+    LOG("locking global mutex\n");
     pthread_mutex_lock(&g_ctx_mutex);
     if (!cuda_crypt_init_locked()) {
         pthread_mutex_unlock(&g_ctx_mutex);
@@ -62,7 +62,7 @@ gpu_ctx_t* get_gpu_ctx() {
     pthread_mutex_unlock(&g_ctx_mutex);
 
     gpu_ctx_t* cur_ctx = &g_gpu_ctx[cur_gpu][cur_queue];
-    LOG("locking contex mutex queue: %d gpu: %d", cur_queue, cur_gpu);
+    LOG("locking contex mutex queue: %d gpu: %d\n", cur_queue, cur_gpu);
     pthread_mutex_lock(&cur_ctx->mutex);
 
     CUDA_CHK(cudaSetDevice(cur_gpu));
@@ -122,7 +122,7 @@ void setup_gpu_ctx(verify_ctx_t* cur_ctx,
         cur_ctx->offsets_len = total_signatures;
     }
 
-    LOG("Done alloc");
+    LOG("Done alloc\n");
 
     CUDA_CHK(cudaMemcpyAsync(cur_ctx->public_key_offsets, public_key_offsets, offsets_size, cudaMemcpyHostToDevice, stream));
     CUDA_CHK(cudaMemcpyAsync(cur_ctx->signature_offsets, signature_offsets, offsets_size, cudaMemcpyHostToDevice, stream));
