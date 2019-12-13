@@ -103,7 +103,7 @@ void setup_gpu_ctx(verify_ctx_t* cur_ctx,
         CUDA_CHK(cudaFree(cur_ctx->out));
         CUDA_CHK(cudaMalloc(&cur_ctx->out, out_size));
 
-        cur_ctx->out_size_bytes = total_signatures;
+        cur_ctx->out_size_bytes = out_size;
     }
 
     if (cur_ctx->public_key_offsets == NULL || cur_ctx->offsets_len < total_signatures) {
