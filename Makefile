@@ -19,6 +19,7 @@ install:
 	mkdir -p $(DESTDIR)
 ifneq ($(OS),Darwin)
 	cp -f src/$(V)/libcuda-crypt.so $(DESTDIR)
+	cp -f src/$(V)/libcl-crypt.so $(DESTDIR)
 endif
 	ls -lh $(DESTDIR)
 

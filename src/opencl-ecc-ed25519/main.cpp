@@ -17,6 +17,8 @@
 
 extern void ed25519_free_gpu_mem();
 
+bool g_verbose = false;
+
 typedef struct {
     size_t size;
     uint64_t num_retransmits;

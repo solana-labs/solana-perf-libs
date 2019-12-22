@@ -127,7 +127,6 @@ void ed25519_verify_many(const gpu_Elems* elems,
         num_elems, total_signatures, total_packets, message_size);
 
     size_t out_size = total_signatures * sizeof(uint8_t);
-    size_t offsets_size = total_signatures * sizeof(uint32_t);
 
     uint32_t total_packets_size = total_packets * message_size;
 
@@ -157,7 +156,7 @@ void ed25519_verify_many(const gpu_Elems* elems,
 
     size_t num_threads_per_block = 64;
     size_t num_blocks = ROUND_UP_DIV(total_signatures, num_threads_per_block) * num_threads_per_block;
-    LOG("num_blocks: %d threads_per_block: %d keys: %d out: %p\n",
+    LOG("num_blocks: %zu threads_per_block: %zu keys: %d out: %p\n",
            num_blocks, num_threads_per_block, (int)total_packets, out);                     
                              
     CL_ERR( clSetKernelArg(ed25519_verify_kernel, 0, sizeof(cl_mem), (void *)&cur_ctx->packets) );
@@ -191,4 +190,15 @@ const char* ed25519_license() {
    return "Copyright (c) 2018 Solana Labs, Inc. "
           "Licensed under the Apache License, Version 2.0 "
           "<http://www.apache.org/licenses/LICENSE-2.0>";
+}
+
+// Supported by the cuda lib, so stub them here.
+int cuda_host_register(void* ptr, size_t size, unsigned int flags)
+{
+    return 0;
+}
+
+int cuda_host_unregister(void* ptr)
+{
+    return 0;
 }

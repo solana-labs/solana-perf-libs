@@ -200,7 +200,7 @@ bool cl_check_init(cl_uint sel_device_type) {
 */
 bool cl_check_init(void) {
 
-    if(cl_is_init == true) {
+    if (cl_is_init == true) {
         return true;
     } else {
         cout << "OpenCL platform query & init..." << endl;
@@ -212,11 +212,10 @@ bool cl_check_init(void) {
     string kernel_src;
 
     cl_device_id device;
-    cl_platform_id platform;
     cl_uint platform_num = 0;
     cl_platform_id* platform_list = NULL;
 
-    cl_uint device_num = 0;
+    cl_uint num_devices = 0;
     cl_device_id* device_list = NULL;
 
     size_t attr_size = 0;
@@ -232,8 +231,7 @@ bool cl_check_init(void) {
     cout << "Platforms found: " << platform_num << endl;
 
     /* list all platforms and VENDOR/VERSION properties */
-    for(int platf=0; platf<platform_num; platf++)
-    {
+    for (cl_uint platf = 0; platf < platform_num; platf++) {
         /* get attribute CL_PLATFORM_VENDOR */
         CL_ERR( clGetPlatformInfo(platform_list[platf],
                 CL_PLATFORM_VENDOR, 0, NULL, &attr_size));
@@ -248,33 +246,36 @@ bool cl_check_init(void) {
 
         /* get attribute size CL_PLATFORM_VERSION */
         CL_ERR( clGetPlatformInfo(platform_list[platf],
-                CL_PLATFORM_VERSION, 0, NULL, &attr_size));
+                                  CL_PLATFORM_VERSION,
+                                  0, NULL, &attr_size));
         attr_data = new char[attr_size];
         DIE(attr_data == NULL, "alloc attr_data");
 
         /* get data size CL_PLATFORM_VERSION */
         CL_ERR( clGetPlatformInfo(platform_list[platf],
-                CL_PLATFORM_VERSION, attr_size, attr_data, NULL));
+                                  CL_PLATFORM_VERSION,
+                                  attr_size, attr_data, NULL));
         cout << attr_data << endl;
         delete[] attr_data;
 
         /* get num of available OpenCL devices type ALL on the selected platform */
-        if(clGetDeviceIDs(platform_list[platf], 
-            query_device_type, 0, NULL, &device_num) != CL_SUCCESS) {
-            device_num = 0;
+        if (clGetDeviceIDs(platform_list[platf],
+                           query_device_type, 0,
+                           NULL, &num_devices) != CL_SUCCESS) {
+            num_devices = 0;
             continue;
         }
 
-        device_list = new cl_device_id[device_num];
+        device_list = new cl_device_id[num_devices];
         DIE(device_list == NULL, "alloc devices");
 
         /* get all available OpenCL devices type ALL on the selected platform */
         CL_ERR( clGetDeviceIDs(platform_list[platf], query_device_type,
-            device_num, device_list, NULL));
-        cout << "\tDevices found " << device_num  << endl;
+            num_devices, device_list, NULL));
+        cout << "\tDevices found " << num_devices  << endl;
 
         /* list all devices and TYPE/VERSION properties */
-        for(int dev=0; dev<device_num; dev++)
+        for(cl_uint dev=0; dev < num_devices; dev++)
         {
             /* get attribute size */
             CL_ERR( clGetDeviceInfo(device_list[dev], CL_DEVICE_NAME,
@@ -291,7 +292,6 @@ bool cl_check_init(void) {
             string tmpAttrData = attr_data;
             
             // always select last device of type GPU
-            platform = platform_list[platf];
             device = device_list[dev];
 
             delete[] attr_data;
