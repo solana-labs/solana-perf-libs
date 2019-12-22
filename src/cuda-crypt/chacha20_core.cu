@@ -57,10 +57,11 @@ static void __host__ __device__ chacha20_encrypt(const u32 input[16],
     }
 }
 
-void __host__ __device__ chacha20_ctr_encrypt(const uint8_t *in, uint8_t *out, size_t in_len,
-                                              const uint8_t key[CHACHA_KEY_SIZE],
-                                              const uint8_t nonce[CHACHA_NONCE_SIZE],
-                                              uint32_t counter)
+void __host__ __device__
+chacha20_ctr_encrypt_device(const uint8_t *in, uint8_t *out, size_t in_len,
+                            const uint8_t key[CHACHA_KEY_SIZE],
+                            const uint8_t nonce[CHACHA_NONCE_SIZE],
+                            uint32_t counter)
 {
   uint32_t input[16];
   uint8_t buf[64];
@@ -105,4 +106,10 @@ void __host__ __device__ chacha20_ctr_encrypt(const uint8_t *in, uint8_t *out, s
   }
 }
 
-
+void chacha20_ctr_encrypt(const uint8_t *in, uint8_t *out, size_t in_len,
+                          const uint8_t key[CHACHA_KEY_SIZE],
+                          const uint8_t nonce[CHACHA_NONCE_SIZE],
+                          uint32_t counter)
+{
+    chacha20_ctr_encrypt_device(in, out, in_len, key, nonce, counter);
+}

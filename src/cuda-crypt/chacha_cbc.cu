@@ -142,7 +142,7 @@ __global__ void chacha_ctr_encrypt_kernel(const unsigned char* input, unsigned c
     size_t i = (size_t)(blockIdx.x * blockDim.x + threadIdx.x);
 
     if (i < num_keys) {
-        chacha20_ctr_encrypt(input, &output[i * length], length, &keys[i * CHACHA_KEY_SIZE], &nonces[i * CHACHA_NONCE_SIZE], 0);
+        chacha20_ctr_encrypt_device(input, &output[i * length], length, &keys[i * CHACHA_KEY_SIZE], &nonces[i * CHACHA_NONCE_SIZE], 0);
     }
 }
 

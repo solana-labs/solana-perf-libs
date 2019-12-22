@@ -92,7 +92,7 @@ void ed25519_sign_many(const gpu_Elems* elems,
 
     size_t num_threads_per_block = 64;
     size_t num_blocks = ROUND_UP_DIV(total_signatures, num_threads_per_block) * num_threads_per_block;
-    LOG("signing blocks: %d threads_per_block: %d\n", num_blocks, num_threads_per_block);
+    LOG("signing blocks: %zu threads_per_block: %zu\n", num_blocks, num_threads_per_block);
 	
     /*
 	__kernel void ed25519_sign_kernel(__global unsigned char* packets,
