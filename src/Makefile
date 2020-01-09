@@ -35,8 +35,9 @@ CFLAGS+=$(CFLAGS_COMMON) -I$(CUDA_HEADER_DIR) -I$(CUDA_SHA256_DIR)
 
 #use -DUSE_RDTSC for Windows compilation
 CL_CFLAGS_common:=-fPIC -std=c++11 $(CFLAGS_COMMON) -DOPENCL_VARIANT \
-		  -I$(CL_HEADER_DIR) -Icommon/ \
-		  -I$(CUDA_DIR)/targets/x86_64-linux/include $(HOST_CFLAGS)
+      -L$(CUDA_DIR)/lib64 \
+      -I$(CL_HEADER_DIR) -Icommon/ \
+      -I$(CUDA_DIR)/targets/x86_64-linux/include $(HOST_CFLAGS)
 CL_CFLAGS_release:=$(CL_CFLAGS_common) -O3
 CL_CFLAGS_debug:=$(CL_CFLAGS_common) -O0 -g
 CL_CFLAGS:=$(CL_CFLAGS_$V)

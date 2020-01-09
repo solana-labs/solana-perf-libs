@@ -150,32 +150,32 @@ void cl_get_compiler_err_log(cl_program program, cl_device_id device)
                           log_size, build_log, NULL);
     build_log[ log_size ] = '\0';
     cout << endl << build_log << endl;
-	
-	delete build_log;
+
+    delete build_log;
 }
 
 /**
 * Check OpenCL init with device selection
 */
 string cl_get_device_type_setup() {
-    
+
     switch(query_device_type) {
         case CL_DEVICE_TYPE_CPU:
             return "CPU";
         break;
-        
+
         case CL_DEVICE_TYPE_GPU:
             return "GPU";
         break;
-        
+
         case CL_DEVICE_TYPE_ACCELERATOR:
             return "ACCELERATOR";
         break;
-        
+
         case CL_DEVICE_TYPE_ALL:
             return "ALL";
         break;
-        
+
         default:
             return "ERROR invalid";
     }
@@ -185,7 +185,7 @@ string cl_get_device_type_setup() {
 * Check OpenCL init with device selection
 */
 bool cl_check_init(cl_uint sel_device_type) {
-    
+
     if(query_device_type != sel_device_type) {
         // if device type changed, invalidate init
         cl_is_init = false;
@@ -362,13 +362,13 @@ bool cl_check_init(void) {
     /* compile the program for the given set of devices */
     ret = clBuildProgram(program, 1, &device, "-DENDIAN_NEUTRAL -DLTC_NO_ASM", NULL, NULL);
     CL_COMPILE_ERR( ret, program, device );
-    
-	ed25519_sign_kernel = clCreateKernel(program, "ed25519_sign_kernel", &ret);
+
+    ed25519_sign_kernel = clCreateKernel(program, "ed25519_sign_kernel", &ret);
     CL_ERR( ret );
-	
+
     ed25519_verify_kernel = clCreateKernel(program, "ed25519_verify_kernel", &ret);
     CL_ERR( ret );
-    
+
     poh_verify_kernel = clCreateKernel(program, "poh_verify_kernel", &ret);
     CL_ERR( ret );
 #endif
