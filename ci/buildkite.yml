@@ -1,6 +1,6 @@
 steps:
   - command: "ci/build.sh"
     name: "build"
-    timeout_in_minutes: 20
+    timeout_in_minutes: 30
     agents:
       - "queue=cuda"
