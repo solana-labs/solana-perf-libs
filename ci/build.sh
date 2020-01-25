@@ -8,6 +8,7 @@ source ci/upload-ci-artifact.sh
 CUDA_HOMES=(
   /usr/local/cuda-10.0
   /usr/local/cuda-10.1
+  /usr/local/cuda-10.2
 )
 
 for CUDA_HOME in "${CUDA_HOMES[@]}"; do
