@@ -20,8 +20,11 @@ Copy libraries to the main Solana repo:
 $ make DESTDIR=${SOLANA_ROOT:?}/target/perf-libs install
 ```
 
-Build Solana with the performance features enabled:
+Build Solana:
 ```bash
 $ cd $SOLANA_ROOT
-$ cargo build --release --features=cuda
+$ cargo build --release
 ```
+
+The library is loaded at startup by `solana_perf::perf_libs`.
+See `perf/src/perf_libs.rs` in the main Solana repo for details.

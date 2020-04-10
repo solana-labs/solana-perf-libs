@@ -128,7 +128,7 @@ $V/poh_verify.o: $(POH_SRCS)
 CL_CPU_GPU_OBJS=$(addprefix $V/,cl_init_platform.o cl_verify.o cl_gpu_ctx.o cl_sign.o cl_chacha.o cl_poh_verify.o)
 
 $V/lib$(CL_LIB).so: $(CL_CPU_GPU_OBJS)
-	$(CXX) -shared $^ -lOpenCL -o $@
+	$(CXX) -shared $^ -L$(CUDA_DIR)/lib64 -lOpenCL -o $@
 
 $V/cl_ecc_main.o: $(CL_ECC_DIR)/main.cpp $(ECC_DIR)/ed25519.h
 	@mkdir -p $(@D)
