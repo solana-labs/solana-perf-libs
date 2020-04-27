@@ -1,6 +1,228 @@
 #include "fixedint.h"
 #include "sc.h"
 #include "common.cu"
+#include "int128.h"
+
+#ifdef __CUDA_ARCH__
+#define CONSTANT __constant__
+#else
+#define CONSTANT const
+#endif
+
+/// R = R % L where R = 2^260
+const __device__ uint64_t R_scalar_u52[] = {
+    0x000f48bd6721e6ed,
+    0x0003bab5ac67e45a,
+    0x000fffffeb35e51b,
+    0x000fffffffffffff,
+    0x00000fffffffffff,
+    };
+
+CONSTANT uint64_t L_scalar_u52[] = {
+    0x0002631a5cf5d3ed,
+    0x000dea2f79cd6581,
+    0x000000000014def9,
+    0x0000000000000000,
+    0x0000100000000000,
+    };
+
+const uint64_t L_FACTOR = 0x51da312547e1b;
+
+// Unpacked 32-byte scalar with 5x 52-bit limbs
+typedef uint64_t scalar32_u52_t[5];
+
+// Packed 32-byte scalar
+typedef uint8_t scalar32_t[32];
+
+void __host__ __device__ scalar52_mul(uint128_t* out, const scalar32_u52_t a, const scalar32_u52_t b) {
+    out[0] = mul_128(a[0], b[0]);
+
+    out[1] = add_128(mul_128(a[0], b[1]), mul_128(a[1], b[0]));
+
+    out[2] = add_128(mul_128(a[0], b[2]), mul_128(a[1], b[1]));
+    out[2] = add_128(out[2], mul_128(a[2], b[0]));
+
+    out[3] = add_128(mul_128(a[0], b[3]), mul_128(a[1], b[2]));
+    out[3] = add_128(out[3], mul_128(a[2], b[1]));
+    out[3] = add_128(out[3], mul_128(a[3], b[0]));
+
+    out[4] = add_128(mul_128(a[0], b[4]), mul_128(a[1], b[3]));
+    out[4] = add_128(out[4], mul_128(a[2], b[2]));
+    out[4] = add_128(out[4], mul_128(a[3], b[1]));
+    out[4] = add_128(out[4], mul_128(a[4], b[0]));
+
+    out[5] = add_128(mul_128(a[1], b[4]), mul_128(a[2], b[3]));
+    out[5] = add_128(out[5], mul_128(a[3], b[2]));
+    out[5] = add_128(out[5], mul_128(a[4], b[1]));
+
+    out[6] = add_128(mul_128(a[2], b[4]), mul_128(a[3], b[3]));
+    out[6] = add_128(out[5], mul_128(a[4], b[2]));
+
+    out[7] = add_128(mul_128(a[3], b[4]), mul_128(a[4], b[3]));
+
+    out[8] = mul_128(a[4], b[4]);
+}
+
+#define MASK_52 ((UINT64_C(1) << 52) - 1)
+
+void __host__ __device__ scalar32_unpack(scalar32_u52_t out, scalar32_t in) {
+    out[0] = MASK_52 & load_7(in);             //   0-51
+    out[1] = MASK_52 & (load_7(in + 6) >> 4);  //  52-103
+    out[2] = MASK_52 & load_7(in + 13);        // 104-156
+    out[3] = MASK_52 & (load_7(in + 19) >> 4); // 156-208
+    out[4] = MASK_52 & load_7(in + 26);        // 208-256
+}
+
+void __host__ __device__ scalar32_pack(scalar32_t out, scalar32_u52_t in) {
+    out[0] = (uint8_t)in[0];
+    out[1] = (uint8_t)(in[0] >> 8);
+    out[2] = (uint8_t)(in[0] >> 16);
+    out[3] = (uint8_t)(in[0] >> 24);
+    out[4] = (uint8_t)(in[0] >> 32);
+    out[5] = (uint8_t)(in[0] >> 40);
+
+    out[6] = (uint8_t)((in[0] >> 48) | (in[1] << 4));
+
+    out[7]  = (uint8_t)(in[1] >>  4);
+    out[8]  = (uint8_t)(in[1] >> 12);
+    out[9]  = (uint8_t)(in[1] >> 20);
+    out[10] = (uint8_t)(in[1] >> 28);
+    out[11] = (uint8_t)(in[1] >> 36);
+    out[12] = (uint8_t)(in[1] >> 44);
+
+    out[13] = (uint8_t)(in[2] >>  0);
+    out[14] = (uint8_t)(in[2] >>  8);
+    out[15] = (uint8_t)(in[2] >> 16);
+    out[16] = (uint8_t)(in[2] >> 24);
+    out[17] = (uint8_t)(in[2] >> 32);
+    out[18] = (uint8_t)(in[2] >> 40);
+
+    out[19] = ((uint8_t)(in[2] >> 48) | (uint8_t)(in[ 3] << 4));
+
+    out[20] = (uint8_t)(in[3] >>  4);
+    out[21] = (uint8_t)(in[3] >> 12);
+    out[22] = (uint8_t)(in[3] >> 20);
+    out[23] = (uint8_t)(in[3] >> 28);
+    out[24] = (uint8_t)(in[3] >> 36);
+    out[25] = (uint8_t)(in[3] >> 44);
+
+    out[26] = (uint8_t)(in[4] >>  0);
+    out[27] = (uint8_t)(in[4] >>  8);
+    out[28] = (uint8_t)(in[4] >> 16);
+    out[29] = (uint8_t)(in[4] >> 24);
+    out[30] = (uint8_t)(in[4] >> 32);
+    out[31] = (uint8_t)(in[4] >> 40);
+}
+
+uint128_t __host__ __device__ rshift_128(uint128_t val, uint64_t n) {
+    val.low >>= n;
+    uint64_t high_to_low = (val.high & MASK_52) << (64 - n);
+    val.low |= high_to_low;
+    val.high >>= n;
+    return val;
+}
+
+void __host__ __device__ part1(uint128_t sum, uint128_t* carry, uint64_t* adjust) {
+    *adjust = (sum.low * L_FACTOR) & MASK_52;
+    *carry = rshift_128(add_128(sum, mul_128(*adjust, L_scalar_u52[0])), 52);
+}
+
+void __host__ __device__ part2(uint128_t sum, uint128_t* carry, uint64_t* adjust) {
+    *adjust = sum.low & MASK_52;
+    *carry = rshift_128(sum, 52);
+}
+
+// r = a - b
+void __host__ __device__ scalar_u52_sub(scalar32_u52_t r, scalar32_u52_t a, const scalar32_u52_t b) {
+    for (int i = 0; i < 5; i++) {
+        r[i] = 0;
+    }
+
+    // a - b
+    uint64_t borrow = 0;
+    for (int i = 0; i < 5; i++) {
+        borrow = a[i] - (b[i] + (borrow >> 63));
+        r[i] = borrow & MASK_52;
+    }
+
+    // conditionally add l if the difference is negative
+    uint64_t underflow_mask = ((borrow >> 63) ^ 1) - 1;
+    uint64_t carry = 0;
+    for (int i = 0; i < 5; i++) {
+        carry = (carry >> 52) + r[i] + (L_scalar_u52[i] & underflow_mask);
+        r[i] = carry & MASK_52;
+    }
+}
+
+void __host__ __device__ montgomery_reduce(scalar32_u52_t s, uint128_t r[9]) {
+    uint128_t carry;
+    uint64_t n0;
+    part1(r[0], &carry, &n0);
+
+    uint64_t n1;
+    uint128_t sum1 = add_128(mul_128(n0, L_scalar_u52[1]), r[1]);
+    sum1 = add_128(sum1, carry);
+    part1(sum1, &carry, &n1);
+
+    uint64_t n2;
+    uint128_t sum2 = add_128(mul_128(n0, L_scalar_u52[2]), mul_128(n1, L_scalar_u52[1]));
+    sum2 = add_128(sum2, r[2]);
+    sum2 = add_128(sum2, carry);
+    part1(sum2, &carry, &n2);
+
+    uint64_t n3;
+    uint128_t sum3 = add_128(mul_128(n1, L_scalar_u52[2]), mul_128(n2, L_scalar_u52[1]));
+    sum3 = add_128(sum3, r[3]);
+    sum3 = add_128(sum3, carry);
+    part1(sum3, &carry, &n3);
+
+    uint64_t n4;
+    uint128_t sum4 = add_128(mul_128(n0, L_scalar_u52[4]), mul_128(n3, L_scalar_u52[1]));
+    sum4 = add_128(sum4, mul_128(n2, L_scalar_u52[2]));
+    sum4 = add_128(sum4, r[4]);
+    sum4 = add_128(sum4, carry);
+    part1(sum4, &carry, &n4);
+
+    uint128_t sum0;
+    scalar32_u52_t r_scalar;
+
+    sum0 = add_128(carry, r[5]);
+    sum0 = add_128(sum0, mul_128(n1, L_scalar_u52[4]));
+    sum0 = add_128(sum0, mul_128(n3, L_scalar_u52[2]));
+    sum0 = add_128(sum0, mul_128(n4, L_scalar_u52[1]));
+    part2(sum0, &carry, &r_scalar[0]);
+
+    sum0 = add_128(carry, r[6]);
+    sum0 = add_128(sum0, mul_128(n2, L_scalar_u52[4]));
+    sum0 = add_128(sum0, mul_128(n4, L_scalar_u52[2]));
+    part2(sum0, &carry, &r_scalar[1]);
+
+    sum0 = add_128(carry, r[7]);
+    sum0 = add_128(sum0, mul_128(n3, L_scalar_u52[4]));
+    part2(sum0, &carry, &r_scalar[2]);
+
+    sum0 = add_128(carry, r[8]);
+    sum0 = add_128(sum0, mul_128(n4, L_scalar_u52[4]));
+    part2(sum0, &carry, &r_scalar[3]);
+
+    r_scalar[4] = carry.low;
+
+    scalar_u52_sub(s, r_scalar, L_scalar_u52);
+}
+
+void __host__ __device__ scalar32_reduce(unsigned char *s) {
+    scalar32_u52_t s_u52;
+    scalar32_unpack(s_u52, s);
+
+    uint128_t s_R[9];
+    scalar52_mul(s_R, s_u52, R_scalar_u52);
+
+    scalar32_u52_t s_R_mod_l;
+    montgomery_reduce(s_R_mod_l, s_R);
+
+    scalar32_pack(s, s_R_mod_l);
+}
+
 
 /*
 Input:
@@ -12,6 +234,7 @@ Output:
   Overwrites s in place.
 */
 
+// 23x 21-bit limbs
 void __host__ __device__ sc_reduce(unsigned char *s) {
     int64_t s0 = 2097151 & load_3(s);
     int64_t s1 = 2097151 & (load_4(s + 2) >> 5);

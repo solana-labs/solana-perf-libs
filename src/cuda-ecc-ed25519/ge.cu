@@ -180,6 +180,29 @@ int __device__ __host__ ge_frombytes_negate_vartime(ge_p3 *h, const unsigned cha
     return 0;
 }
 
+// x = 1, y = 0, z = 0, t = 1
+int __host__ __device__ ge_is_identity(ge_p3* p) {
+    return (fe_is_0(p->X) &&
+            fe_is_1(p->Y) &&
+            fe_is_1(p->Z) &&
+            fe_is_0(p->T)) ? 1 : 0;
+}
+
+int __host__ __device__ ge_is_small_order(ge_p3* p) {
+    ge_p1p1 r;
+    ge_p2 s;
+    ge_p3 q;
+
+    // calculate q = p * 2*3
+    ge_p3_dbl(&r, p);
+    ge_p1p1_to_p2(&s, &r);
+    ge_p2_dbl(&r, &s);
+    ge_p1p1_to_p2(&s, &r);
+    ge_p2_dbl(&r, &s);
+    ge_p1p1_to_p3(&q, &r);
+
+    return ge_is_identity(&q);
+}
 
 /*
 r = p + q
