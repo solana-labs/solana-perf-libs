@@ -43,6 +43,28 @@ void __device__ __host__ fe_1(fe h) {
 }
 
 
+int __host__ __device__ fe_is_1(fe h) {
+    if (h[0] != 1) {
+        return 0;
+    }
+    for (int i = 1; i < 9; i++) {
+        if (h[i] != 0) {
+            return 0;
+        }
+    }
+    return 1;
+}
+
+int __host__ __device__ fe_is_0(fe h) {
+    for (int i = 0; i < 9; i++) {
+        if (h[i] != 0) {
+            return 0;
+        }
+    }
+    return 1;
+}
+
+
 
 /*
     h = f + g

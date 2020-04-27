@@ -18,6 +18,8 @@ typedef int32_t fe[10];
 
 void __host__ __device__ fe_0(fe h);
 void __device__ __host__ fe_1(fe h);
+int __device__ __host__ fe_is_0(fe h);
+int __device__ __host__ fe_is_1(fe h);
 
 void __device__ __host__ fe_frombytes(fe h, const unsigned char *s);
 void __device__ __host__ fe_tobytes(unsigned char *s, const fe h);
