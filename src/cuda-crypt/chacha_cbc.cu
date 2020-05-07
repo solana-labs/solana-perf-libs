@@ -10,80 +10,96 @@
 # define STRICT_ALIGNMENT 0
 #endif
 
-__host__ __device__ void cuda_chacha20_cbc128_encrypt(const unsigned char* in, unsigned char* out,
-                                                      uint32_t len, const uint8_t* key,
-                                                      unsigned char* ivec)
-{
-    size_t n;
-    unsigned char *iv = ivec;
+typedef union {
+    uint32_t u[16];
+    uint8_t c[64];
+} chacha_buf;
 
-    if (len == 0) {
-        return;
-    }
-
-#if !defined(OPENSSL_SMALL_FOOTPRINT)
-    if (STRICT_ALIGNMENT &&
-        ((size_t)in | (size_t)out | (size_t)ivec) % sizeof(size_t) != 0) {
-        while (len >= CHACHA_BLOCK_SIZE) {
-            for (n = 0; n < CHACHA_BLOCK_SIZE; ++n) {
-                out[n] = in[n] ^ iv[n];
-                //printf("%x ", out[n]);
-            }
-            chacha20_encrypt((const u32*)out, out, CHACHA_ROUNDS);
-            iv = out;
-            len -= CHACHA_BLOCK_SIZE;
-            in += CHACHA_BLOCK_SIZE;
-            out += CHACHA_BLOCK_SIZE;
-        }
-    } else {
-        while (len >= CHACHA_BLOCK_SIZE) {
-            for (n = 0; n < CHACHA_BLOCK_SIZE; n += sizeof(size_t)) {
-                *(size_t *)(out + n) =
-                    *(size_t *)(in + n) ^ *(size_t *)(iv + n);
-                //printf("%zu ", *(size_t *)(iv + n));
-            }
-            chacha20_encrypt((const u32*)out, out, CHACHA_ROUNDS);
-            iv = out;
-            len -= CHACHA_BLOCK_SIZE;
-            in += CHACHA_BLOCK_SIZE;
-            out += CHACHA_BLOCK_SIZE;
-        }
-    }
+#ifdef __CUDA_ARCH__
+#define SIGMA_DEF __device__ __constant__
+#else
+#define SIGMA_DEF
 #endif
-    while (len) {
-        for (n = 0; n < CHACHA_BLOCK_SIZE && n < len; ++n) {
-            out[n] = in[n] ^ iv[n];
-        }
-        for (; n < CHACHA_BLOCK_SIZE; ++n) {
-            out[n] = iv[n];
-        }
-        chacha20_encrypt((const u32*)out, out, CHACHA_ROUNDS);
-        iv = out;
-        if (len <= CHACHA_BLOCK_SIZE) {
-            break;
-        }
-        len -= CHACHA_BLOCK_SIZE;
-        in += CHACHA_BLOCK_SIZE;
-        out += CHACHA_BLOCK_SIZE;
-    }
-    memcpy(ivec, iv, CHACHA_BLOCK_SIZE);
 
+// sigma contains the ChaCha constants, which happen to be an ASCII string.
+static const uint8_t SIGMA_DEF sigma[16] = { 'e', 'x', 'p', 'a', 'n', 'd', ' ', '3',
+                                             '2', '-', 'b', 'y', 't', 'e', ' ', 'k' };
+
+static uint32_t __device__ __host__ load_4(const uint8_t* ptr) {
+    return ptr[0]
+        | (ptr[1] << 8)
+        | (ptr[2] << 16)
+        | (ptr[3] << 24);
 }
 
-void cuda_chacha20_cbc_encrypt(const uint8_t *in, uint8_t *out, size_t in_len,
-                               const uint8_t key[CHACHA_KEY_SIZE], uint8_t* ivec)
+__device__ __host__
+void cuda_chacha20_cbc128_encrypt(
+        const uint8_t* inp,
+        uint8_t* out,
+        ssize_t len,
+        const uint32_t key[CHACHA_KEY_SIZE_U32],
+        const uint8_t iv[CHACHA_IV_SIZE])
+{
+    chacha_buf input;
+    chacha_buf buf;
+    ssize_t todo;
+
+    /* sigma constant "expand 32-byte k" in little-endian encoding */
+    input.u[0] =   load_4(&sigma[0]);
+    input.u[1] =   load_4(&sigma[4]);
+    input.u[2] =   load_4(&sigma[8]);
+    input.u[3] =   load_4(&sigma[12]);
+
+    input.u[4] = key[0];
+    input.u[5] = key[1];
+    input.u[6] = key[2];
+    input.u[7] = key[3];
+    input.u[8] = key[4];
+    input.u[9] = key[5];
+    input.u[10] = key[6];
+    input.u[11] = key[7];
+
+    input.u[12] = load_4(&iv[0]);
+    input.u[13] = load_4(&iv[4]);
+    input.u[14] = load_4(&iv[8]);
+    input.u[15] = load_4(&iv[12]);
+
+    while (len > 0) {
+        todo = sizeof(buf);
+        if (len < todo) {
+            todo = len;
+        }
+
+        chacha20_encrypt(input.u, buf.c, CHACHA_ROUNDS);
+
+        for (ssize_t i = 0; i < todo; i++) {
+            out[i] = inp[i] ^ buf.c[i];
+            input.c[i] ^= out[i];
+        }
+        out += todo;
+        inp += todo;
+        len -= todo;
+    }
+}
+
+void
+cuda_chacha20_cbc_encrypt(const uint8_t *in,
+                          uint8_t *out,
+                          size_t in_len,
+                          const uint32_t key[CHACHA_KEY_SIZE_U32],
+                          uint8_t* ivec)
 {
     cuda_chacha20_cbc128_encrypt(in, out, in_len, key, ivec);
 }
 
 __global__ void chacha20_cbc128_encrypt_kernel(const unsigned char* input, unsigned char* output,
-                                               size_t length, const uint8_t* keys,
+                                               size_t length, const uint32_t* keys,
                                                unsigned char* ivec, uint32_t num_keys)
 {
     size_t i = (size_t)(blockIdx.x * blockDim.x + threadIdx.x);
 
     if (i < num_keys) {
-        cuda_chacha20_cbc128_encrypt(input, &output[i * length], length, &keys[i], &ivec[i * CHACHA_BLOCK_SIZE]);
+        cuda_chacha20_cbc128_encrypt(input, &output[i * length], length, &keys[i], &ivec[i * CHACHA_IV_SIZE]);
     }
 }
 
@@ -104,22 +120,23 @@ __global__ void end_sha256_state_kernel(hash_state* sha_state, uint8_t* out_stat
     }
 }
 
-__global__ void chacha20_cbc128_encrypt_sample_kernel(const uint8_t* input,
-                                                      uint8_t* output,
-                                                      size_t length,
-                                                      const uint8_t* keys,
-                                                      uint8_t* ivec,
-                                                      uint32_t num_keys,
-                                                      hash_state* sha_state,
-                                                      uint64_t* sample_idx,
-                                                      uint32_t sample_len,
-                                                      uint64_t block_offset)
+__global__ void
+chacha20_cbc128_encrypt_sample_kernel(const uint8_t* input,
+                                      uint8_t* output,
+                                      size_t length,
+                                      const uint32_t* keys,
+                                      uint8_t* ivec,
+                                      uint32_t num_keys,
+                                      hash_state* sha_state,
+                                      uint64_t* sample_idx,
+                                      uint32_t sample_len,
+                                      uint64_t block_offset)
 {
     size_t i = (size_t)(blockIdx.x * blockDim.x + threadIdx.x);
 
     if (i < num_keys) {
         uint8_t* t_output = &output[i * BLOCK_SIZE];
-        cuda_chacha20_cbc128_encrypt(input, t_output, length, &keys[i * CHACHA_KEY_SIZE], &ivec[i * CHACHA_BLOCK_SIZE]);
+        cuda_chacha20_cbc128_encrypt(input, t_output, length, &keys[i * CHACHA_KEY_SIZE_U32], &ivec[i * CHACHA_IV_SIZE]);
 
         for (uint32_t j = 0; j < sample_len; j++) {
             uint64_t cur_sample = sample_idx[j] * SAMPLE_SIZE;
@@ -144,7 +161,7 @@ void chacha_cbc_encrypt_many(const unsigned char *in, unsigned char *out,
     uint8_t* in_device = NULL;
     uint8_t* in_device0 = NULL;
     uint8_t* in_device1 = NULL;
-    uint8_t* keys_device = NULL;
+    uint32_t* keys_device = NULL;
     uint8_t* output_device = NULL;
     uint8_t* output_device0 = NULL;
     uint8_t* output_device1 = NULL;
@@ -153,11 +170,11 @@ void chacha_cbc_encrypt_many(const unsigned char *in, unsigned char *out,
     CUDA_CHK(cudaMalloc(&in_device0, BLOCK_SIZE));
     CUDA_CHK(cudaMalloc(&in_device1, BLOCK_SIZE));
 
-    size_t keys_size = CHACHA_KEY_SIZE * num_keys;
+    size_t keys_size = CHACHA_KEY_SIZE_BYTES * num_keys;
     CUDA_CHK(cudaMalloc(&keys_device, keys_size));
     CUDA_CHK(cudaMemcpy(keys_device, keys, keys_size, cudaMemcpyHostToDevice));
 
-    size_t ivec_size = CHACHA_BLOCK_SIZE * num_keys;
+    size_t ivec_size = CHACHA_IV_SIZE * num_keys;
     CUDA_CHK(cudaMalloc(&ivec_device, ivec_size));
     CUDA_CHK(cudaMemcpy(ivec_device, ivec, ivec_size, cudaMemcpyHostToDevice));
 
@@ -286,7 +303,7 @@ void chacha_cbc_encrypt_many_sample(const uint8_t* in,
     uint8_t* output_device = NULL;
     uint8_t* output_device0 = NULL;
     uint8_t* output_device1 = NULL;
-    uint8_t* keys_device = NULL;
+    uint32_t* keys_device = NULL;
     uint8_t* ivec_device = NULL;
 
     hash_state* sha_state_device = NULL;
@@ -306,11 +323,11 @@ void chacha_cbc_encrypt_many_sample(const uint8_t* in,
     CUDA_CHK(cudaMalloc(&in_device0, BLOCK_SIZE));
     CUDA_CHK(cudaMalloc(&in_device1, BLOCK_SIZE));
 
-    size_t keys_size = CHACHA_KEY_SIZE * num_keys;
+    size_t keys_size = CHACHA_KEY_SIZE_BYTES * num_keys;
     CUDA_CHK(cudaMalloc(&keys_device, keys_size));
     CUDA_CHK(cudaMemcpy(keys_device, keys, keys_size, cudaMemcpyHostToDevice));
 
-    size_t ivec_size = CHACHA_BLOCK_SIZE * num_keys;
+    size_t ivec_size = CHACHA_IV_SIZE * num_keys;
     CUDA_CHK(cudaMalloc(&ivec_device, ivec_size));
     CUDA_CHK(cudaMemcpy(ivec_device, ivecs, ivec_size, cudaMemcpyHostToDevice));
 
@@ -343,8 +360,8 @@ void chacha_cbc_encrypt_many_sample(const uint8_t* in,
     LOG("ivecs:\n");
     for (size_t nkey = 0; nkey < num_keys; nkey++) {
         LOG("ivec: %zu:\n", nkey);
-        for (size_t i = 0; i < CHACHA_BLOCK_SIZE; i++) {
-            LOG("%d ", ivecs[nkey * CHACHA_BLOCK_SIZE + i]);
+        for (size_t i = 0; i < CHACHA_IV_SIZE; i++) {
+            LOG("%d ", ivecs[nkey * CHACHA_IV_SIZE + i]);
         }
         LOG("\n");
     }

@@ -22,19 +22,10 @@
   x[a] = PLUS(x[a],x[b]); x[d] = ROTATE(XOR(x[d],x[a]), 8); \
   x[c] = PLUS(x[c],x[d]); x[b] = ROTATE(XOR(x[b],x[c]), 7);
 
-#ifdef __CUDA_ARCH__
-#define SIGMA_DEF __device__ __constant__
-#else
-#define SIGMA_DEF
-#endif
-
-// sigma contains the ChaCha constants, which happen to be an ASCII string.
-static const uint8_t SIGMA_DEF sigma[16] = { 'e', 'x', 'p', 'a', 'n', 'd', ' ', '3',
-                                             '2', '-', 'b', 'y', 't', 'e', ' ', 'k' };
-
-static void __host__ __device__ chacha20_encrypt(const u32 input[16],
-                                                 unsigned char output[64],
-                                                 int num_rounds)
+static void __host__ __device__
+chacha20_encrypt(const u32 input[16],
+                 unsigned char output[64],
+                 int num_rounds)
 {
     u32 x[16];
     int i;

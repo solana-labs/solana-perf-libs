@@ -65,8 +65,8 @@ void clear_ctx(ctx_t* ctx)
 int test_chacha_cbc_sample(ctx_t* gctx)
 {
     printf("Starting gpu cbc chacha..\n");
-    uint8_t key[CHACHA_KEY_SIZE] = {0};
-    for (int i = 0; i < CHACHA_KEY_SIZE; i++) {
+    uint32_t key[CHACHA_KEY_SIZE_U32] = {0};
+    for (int i = 0; i < CHACHA_KEY_SIZE_U32; i++) {
         key[i] = i;
     }
 
@@ -92,10 +92,10 @@ int test_chacha_cbc_sample(ctx_t* gctx)
 
     uint8_t* outputs = (uint8_t*)calloc(gctx->len, gctx->num_keys);
     uint8_t* ivecs = (uint8_t*)calloc(CHACHA_BLOCK_SIZE, gctx->num_keys);
-    uint8_t* keys = (uint8_t*)calloc(CHACHA_KEY_SIZE, gctx->num_keys);
+    uint8_t* keys = (uint8_t*)calloc(CHACHA_KEY_SIZE_BYTES, gctx->num_keys);
 
     for (uint32_t i = 0; i < gctx->num_keys; i++) {
-        memcpy(&keys[i * CHACHA_KEY_SIZE], key, CHACHA_KEY_SIZE);
+        memcpy(&keys[i * CHACHA_KEY_SIZE_BYTES], key, CHACHA_KEY_SIZE_BYTES);
         memcpy(&ivecs[i * CHACHA_BLOCK_SIZE], gctx->chacha_ivec_orig, CHACHA_BLOCK_SIZE);
     }
 
@@ -140,8 +140,8 @@ int test_chacha_cbc_sample(ctx_t* gctx)
 int test_chacha_cbc(ctx_t* gctx)
 {
     printf("Starting gpu cbc chacha..\n");
-    uint8_t key[CHACHA_KEY_SIZE] = {0};
-    for (int i = 0; i < CHACHA_KEY_SIZE; i++) {
+    uint32_t key[CHACHA_KEY_SIZE_U32] = {0};
+    for (int i = 0; i < CHACHA_KEY_SIZE_U32; i++) {
         key[i] = i;
     }
 
@@ -167,10 +167,10 @@ int test_chacha_cbc(ctx_t* gctx)
 
     uint8_t* outputs = (uint8_t*)calloc(gctx->len, gctx->num_keys);
     uint8_t* ivecs = (uint8_t*)calloc(CHACHA_BLOCK_SIZE, gctx->num_keys);
-    uint8_t* keys = (uint8_t*)calloc(CHACHA_KEY_SIZE, gctx->num_keys);
+    uint8_t* keys = (uint8_t*)calloc(CHACHA_KEY_SIZE_BYTES, gctx->num_keys);
 
     for (uint32_t i = 0; i < gctx->num_keys; i++) {
-        memcpy(&keys[i * CHACHA_KEY_SIZE], key, CHACHA_KEY_SIZE);
+        memcpy(&keys[i * CHACHA_KEY_SIZE_BYTES], key, CHACHA_KEY_SIZE_BYTES);
         memcpy(&ivecs[i * CHACHA_BLOCK_SIZE], gctx->chacha_ivec_orig, CHACHA_BLOCK_SIZE);
     }
 
