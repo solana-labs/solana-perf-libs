@@ -209,73 +209,6 @@ int test_chacha_cbc(ctx_t* gctx)
 }
 
 
-int test_chacha_ctr(ctx_t* gctx)
-{
-    printf("Starting gpu ctr chacha..\n");
-    uint8_t key[CHACHA_KEY_SIZE] = {0};
-    uint8_t nonce[CHACHA_NONCE_SIZE] = {0};
-    for (int i = 0; i < CHACHA_KEY_SIZE; i++) {
-        key[i] = i;
-    }
-
-    for (int i = 0; i < CHACHA_NONCE_SIZE; i++) {
-        nonce[i] = i;
-    }
-
-    chacha20_ctr_encrypt(gctx->input, gctx->output_ref, gctx->len, key, nonce, 0);
-
-    printf("\n\n");
-    print_bytes("output_ref", gctx->output_ref, gctx->len);
-
-    int iterations = 1;
-    perftime_t start, end;
-    get_time(&start);
-    for (int i = 0; i < iterations; i++) {
-        chacha20_ctr_encrypt(gctx->input, gctx->output, gctx->len, key, nonce, i);
-    }
-    get_time(&end);
-
-    print_bytes("output", gctx->output, gctx->len);
-
-    float time_us = get_diff(&start, &end);
-    float ns_per_byte = 1000.f * time_us / ((float)iterations * (float)gctx->len);
-    printf("time: %f ns/byte time: %f us\n", ns_per_byte, time_us);
-
-    uint8_t* outputs = (uint8_t*)calloc(gctx->len, gctx->num_keys);
-    uint8_t* nonces = (uint8_t*)calloc(CHACHA_NONCE_SIZE, gctx->num_keys);
-    uint8_t* keys = (uint8_t*)calloc(CHACHA_KEY_SIZE, gctx->num_keys);
-
-    for (uint32_t i = 0; i < gctx->num_keys; i++) {
-        memcpy(&keys[i * CHACHA_KEY_SIZE], key, CHACHA_KEY_SIZE);
-        memcpy(&nonces[i * CHACHA_NONCE_SIZE], nonce, CHACHA_NONCE_SIZE);
-    }
-
-    chacha_ctr_encrypt_many((uint8_t*)gctx->input, outputs, gctx->len, keys, nonces, gctx->num_keys, &time_us);
-
-    ns_per_byte = 1000.f * time_us / ((float)gctx->len * (float)gctx->num_keys);
-    printf("gpu time: %f ns/byte time: %f us\n", ns_per_byte, time_us);
-
-    int output_errors = 0, ivec_errors = 0;
-    for (uint32_t i = 0; i < gctx->num_keys; i++) {
-        if (0 != verbose_memcmp(gctx->output_ref, &outputs[i * gctx->len], gctx->len)) {
-            if (output_errors < 10) {
-                printf("%d gpu output not matching! %x\n", i, outputs[0]);
-            }
-            output_errors++;
-            break;
-        }
-    }
-    printf("total keys: %d output_errors: %d ivec_errors: %d\n", gctx->num_keys, output_errors, ivec_errors);
-
-    print_bytes("gpu output", outputs, gctx->len);
-
-    free(outputs);
-    free(nonces);
-    free(keys);
-
-    return 0;
-}
-
 int test_aes(ctx_t* gctx)
 {
     printf("Starting gpu aes..\n");
@@ -390,7 +323,6 @@ int main(int argc, const char* argv[]) {
     //test_aes(&ctx);
     clear_ctx(&ctx);
 
-    //test_chacha_ctr(&ctx);
     //clear_ctx(&ctx);
 
     //test_chacha_cbc(&ctx);
