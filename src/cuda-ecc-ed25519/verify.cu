@@ -130,6 +130,10 @@ ed25519_verify_device(const unsigned char *signature,
         return 0;
     }
 
+    if (0 != ge_is_small_order(&A)) {
+        return 0;
+    }
+
     sha512_init(&hash);
     sha512_update(&hash, signature, 32);
     sha512_update(&hash, public_key, 32);
