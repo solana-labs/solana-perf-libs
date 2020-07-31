@@ -57,9 +57,11 @@ int  __host__ __device__ ge_frombytes_negate_vartime(ge_p3 *h, const unsigned ch
 
 void __host__ __device__ ge_add(ge_p1p1 *r, const ge_p3 *p, const ge_cached *q);
 void __host__ __device__ ge_sub(ge_p1p1 *r, const ge_p3 *p, const ge_cached *q);
+void __host__ __device__ ge_addsub(ge_p1p1 *r, const ge_p3 *p, const ge_cached *q, bool add);
 void __host__ __device__ ge_double_scalarmult_vartime(ge_p2 *r, const unsigned char *a, const ge_p3 *A, const unsigned char *b);
 void __host__ __device__ ge_madd(ge_p1p1 *r, const ge_p3 *p, const ge_precomp *q);
 void __host__ __device__ ge_msub(ge_p1p1 *r, const ge_p3 *p, const ge_precomp *q);
+void __host__ __device__ ge_maddsub(ge_p1p1 *r, const ge_p3 *p, const ge_precomp *q, bool add);
 void __host__ __device__ ge_scalarmult_base(ge_p3 *h, const unsigned char *a);
 
 void __host__ __device__ ge_p1p1_to_p2(ge_p2 *r, const ge_p1p1 *p);

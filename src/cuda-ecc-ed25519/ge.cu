@@ -109,20 +109,20 @@ void __host__ __device__ ge_double_scalarmult_vartime(ge_p2 *r, const unsigned c
     for (; i >= 0; --i) {
         ge_p2_dbl(&t, r);
 
-        if (aslide[i] > 0) {
+        bool a_gt_zero = aslide[i] > 0;
+        bool a_lt_zero = aslide[i] < 0;
+        if (a_gt_zero || a_lt_zero) {
             ge_p1p1_to_p3(&u, &t);
-            ge_add(&t, &u, &Ai[aslide[i] / 2]);
-        } else if (aslide[i] < 0) {
-            ge_p1p1_to_p3(&u, &t);
-            ge_sub(&t, &u, &Ai[(-aslide[i]) / 2]);
+            const ge_cached* p = a_gt_zero ? &Ai[aslide[i] / 2] : &Ai[(-aslide[i]) / 2];
+            ge_addsub(&t, &u, p, a_gt_zero);
         }
 
-        if (bslide[i] > 0) {
+        bool b_gt_zero = bslide[i] > 0;
+        bool b_lt_zero = bslide[i] < 0;
+        if (b_gt_zero || b_lt_zero) {
             ge_p1p1_to_p3(&u, &t);
-            ge_madd(&t, &u, &Bi[bslide[i] / 2]);
-        } else if (bslide[i] < 0) {
-            ge_p1p1_to_p3(&u, &t);
-            ge_msub(&t, &u, &Bi[(-bslide[i]) / 2]);
+            const ge_precomp* p = b_gt_zero ? &Bi[bslide[i] / 2] : &Bi[(-bslide[i]) / 2];
+            ge_maddsub(&t, &u, p, b_gt_zero);
         }
 
         ge_p1p1_to_p2(r, &t);
@@ -202,6 +202,32 @@ int __host__ __device__ ge_is_small_order(ge_p3* p) {
     ge_p1p1_to_p3(&q, &r);
 
     return ge_is_identity(&q);
+}
+
+
+void __host__ __device__ ge_maddsub(ge_p1p1 *r, const ge_p3 *p, const ge_precomp *q, bool add) {
+    fe t0;
+
+    fe_add(r->X, p->Y, p->X);
+    fe_sub(r->Y, p->Y, p->X);
+
+    const int32_t* arg = add ? q->yplusx : q->yminusx;
+    fe_mul(r->Z, r->X, arg);
+
+    arg = add ? q->yminusx : q->yplusx;
+    fe_mul(r->Y, r->Y, arg);
+
+    fe_mul(r->T, q->xy2d, p->T);
+    fe_add(t0, p->Z, p->Z);
+    fe_sub(r->X, r->Z, r->Y);
+    fe_add(r->Y, r->Z, r->Y);
+    if (add) {
+        fe_add(r->Z, t0, r->T);
+        fe_sub(r->T, t0, r->T);
+    } else {
+        fe_sub(r->Z, t0, r->T);
+        fe_add(r->T, t0, r->T);
+    }
 }
 
 /*
@@ -476,6 +502,35 @@ void __host__ __device__ ge_sub(ge_p1p1 *r, const ge_p3 *p, const ge_cached *q) 
     fe_sub(r->Z, t0, r->T);
     fe_add(r->T, t0, r->T);
 }
+
+void __host__ __device__ ge_addsub(ge_p1p1 *r, const ge_p3 *p, const ge_cached *q, bool add) {
+    fe t0;
+
+    fe_add(r->X, p->Y, p->X);
+    fe_sub(r->Y, p->Y, p->X);
+
+    const int32_t* arg = add ? q->YplusX : q->YminusX;
+    fe_mul(r->Z, r->X, arg);
+
+    arg = add ? q->YminusX : q->YplusX;
+    fe_mul(r->Y, r->Y, arg);
+
+    fe_mul(r->T, q->T2d, p->T);
+    fe_mul(r->X, p->Z, q->Z);
+
+    fe_add(t0, r->X, r->X);
+    fe_sub(r->X, r->Z, r->Y);
+    fe_add(r->Y, r->Z, r->Y);
+
+    if (add) {
+        fe_add(r->Z, t0, r->T);
+        fe_sub(r->T, t0, r->T);
+    } else {
+        fe_sub(r->Z, t0, r->T);
+        fe_add(r->T, t0, r->T);
+    }
+}
+
 
 
 void __host__ __device__ ge_tobytes(unsigned char *s, const ge_p2 *h) {
