@@ -25,6 +25,7 @@ extern "C" {
 int ED25519_DECLSPEC ed25519_create_seed(unsigned char *seed);
 #endif
 
+#define SHA512_SIZE 64
 #define PUB_KEY_SIZE 32
 #define PRIV_KEY_SIZE 64
 #define SEED_SIZE 32

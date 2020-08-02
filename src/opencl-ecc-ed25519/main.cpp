@@ -9,6 +9,8 @@
 #include <pthread.h>
 #include "gpu_common.h"
 #include "gpu_ctx.h"
+#include "seed.cu"
+#include "keypair.cu"
 
 #define USE_CLOCK_GETTIME
 #include "perftime.h"

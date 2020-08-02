@@ -57,25 +57,47 @@ static void __host__ __device__ slide(signed char *r, const unsigned char *a) {
         }
 }
 
-/*
-r = a * A + b * B
-where a = a[0]+256*a[1]+...+256^31 a[31].
-and b = b[0]+256*b[1]+...+256^31 b[31].
-B is the Ed25519 base point (x,4/5) with x positive.
-*/
+// x = 1, y = 0, z = 0, t = 1
+int __host__ __device__ ge_is_identity(ge_p3* p) {
+    return (fe_is_0(p->X) &&
+            fe_is_1(p->Y) &&
+            fe_is_1(p->Z) &&
+            fe_is_0(p->T)) ? 1 : 0;
+}
 
-void __host__ __device__ ge_double_scalarmult_vartime(ge_p2 *r, const unsigned char *a, const ge_p3 *A, const unsigned char *b) {
-    signed char aslide[256];
-    signed char bslide[256];
-    ge_cached Ai[8]; /* A,3A,5A,7A,9A,11A,13A,15A */
+int __host__ __device__ ge_is_small_order(ge_p3* p) {
+    ge_p1p1 r;
+    ge_p2 s;
+    ge_p3 q;
+
+    // calculate q = p * 2*3
+    ge_p3_dbl(&r, p);
+    ge_p1p1_to_p2(&s, &r);
+    ge_p2_dbl(&r, &s);
+    ge_p1p1_to_p2(&s, &r);
+    ge_p2_dbl(&r, &s);
+    ge_p1p1_to_p3(&q, &r);
+
+    return ge_is_identity(&q);
+}
+
+int __host__ __device__ ge_gen_lookup(const unsigned char* public_key, ge_cached* Ai) {
+    ge_p3 A;
+
+    if (0 != ge_frombytes_negate_vartime(&A, public_key)) {
+        return 0;
+    }
+
+    if (0 != ge_is_small_order(&A)) {
+        return 0;
+    }
+
     ge_p1p1 t;
     ge_p3 u;
     ge_p3 A2;
-    int i;
-    slide(aslide, a);
-    slide(bslide, b);
-    ge_p3_to_cached(&Ai[0], A);
-    ge_p3_dbl(&t, A);
+
+    ge_p3_to_cached(&Ai[0], &A);
+    ge_p3_dbl(&t, &A);
     ge_p1p1_to_p3(&A2, &t);
     ge_add(&t, &A2, &Ai[0]);
     ge_p1p1_to_p3(&u, &t);
@@ -98,6 +120,25 @@ void __host__ __device__ ge_double_scalarmult_vartime(ge_p2 *r, const unsigned c
     ge_add(&t, &A2, &Ai[6]);
     ge_p1p1_to_p3(&u, &t);
     ge_p3_to_cached(&Ai[7], &u);
+
+    return 1;
+}
+
+/*
+r = a * A + b * B
+where a = a[0]+256*a[1]+...+256^31 a[31].
+and b = b[0]+256*b[1]+...+256^31 b[31].
+B is the Ed25519 base point (x,4/5) with x positive.
+*/
+
+void __host__ __device__ ge_double_scalarmult_vartime(ge_p2 *r, const unsigned char *a, const ge_cached* Ai, const unsigned char *b) {
+    signed char aslide[256];
+    signed char bslide[256];
+    ge_p1p1 t;
+    ge_p3 u;
+    int i;
+    slide(aslide, a);
+    slide(bslide, b);
     ge_p2_0(r);
 
     for (i = 255; i >= 0; --i) {
@@ -178,30 +219,6 @@ int __device__ __host__ ge_frombytes_negate_vartime(ge_p3 *h, const unsigned cha
 
     fe_mul(h->T, h->X, h->Y);
     return 0;
-}
-
-// x = 1, y = 0, z = 0, t = 1
-int __host__ __device__ ge_is_identity(ge_p3* p) {
-    return (fe_is_0(p->X) &&
-            fe_is_1(p->Y) &&
-            fe_is_1(p->Z) &&
-            fe_is_0(p->T)) ? 1 : 0;
-}
-
-int __host__ __device__ ge_is_small_order(ge_p3* p) {
-    ge_p1p1 r;
-    ge_p2 s;
-    ge_p3 q;
-
-    // calculate q = p * 2*3
-    ge_p3_dbl(&r, p);
-    ge_p1p1_to_p2(&s, &r);
-    ge_p2_dbl(&r, &s);
-    ge_p1p1_to_p2(&s, &r);
-    ge_p2_dbl(&r, &s);
-    ge_p1p1_to_p3(&q, &r);
-
-    return ge_is_identity(&q);
 }
 
 
