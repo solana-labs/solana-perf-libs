@@ -110,12 +110,10 @@ static int __device__ __host__
 ed25519_verify_device(const unsigned char *signature,
                       const unsigned char *message,
                       uint32_t message_len,
-                      const unsigned char *public_key) {
-    unsigned char h[64];
-    unsigned char checker[32];
+                      const unsigned char *public_key,
+                      unsigned char* h) {
     sha512_context hash;
-    ge_p3 A;
-    ge_p2 R;
+    unsigned char checker[32];
 
     // Check that s.reduce() == s
     if (0 != get_checked_scalar(checker, signature + 32)) {
@@ -126,14 +124,6 @@ ed25519_verify_device(const unsigned char *signature,
         return 0;
     }
 
-    if (0 != ge_frombytes_negate_vartime(&A, public_key)) {
-        return 0;
-    }
-
-    if (0 != ge_is_small_order(&A)) {
-        return 0;
-    }
-
     sha512_init(&hash);
     sha512_update(&hash, signature, 32);
     sha512_update(&hash, public_key, 32);
@@ -141,7 +131,17 @@ ed25519_verify_device(const unsigned char *signature,
     sha512_final(&hash, h);
 
     sc_reduce(h);
-    ge_double_scalarmult_vartime(&R, h, &A, signature + 32);
+    return 1;
+}
+
+static int __device__ __host__
+ed25519_verify_scalar_double(const unsigned char* signature,
+                             const unsigned char* h,
+                             ge_cached* Ai) {
+    unsigned char checker[32];
+    ge_p2 R;
+
+    ge_double_scalarmult_vartime(&R, h, Ai, signature + 32);
     ge_tobytes(checker, &R);
 
     if (!consttime_equal(checker, signature)) {
@@ -156,17 +156,64 @@ ed25519_verify(const unsigned char *signature,
                const unsigned char *message,
                uint32_t message_len,
                const unsigned char *public_key) {
-    return ed25519_verify_device(signature, message, message_len, public_key);
+    unsigned char h[SHA512_SIZE];
+    if (0 == ed25519_verify_device(signature, message, message_len, public_key, h)) {
+        return 0;
+    }
+
+    ge_cached Ai[GE_LOOKUP_SIZE];
+    if (0 == ge_gen_lookup(public_key, Ai)) {
+        return 0;
+    }
+
+    if (0 == ed25519_verify_scalar_double(signature, h, Ai)) {
+        return 0;
+    }
+
+    return 1;
 }
 
-__global__ void ed25519_verify_kernel(const uint8_t* packets,
-                                      uint32_t message_size,
-                                      uint32_t* message_lens,
-                                      uint32_t* public_key_offsets,
-                                      uint32_t* signature_offsets,
-                                      uint32_t* message_start_offsets,
-                                      size_t num_keys,
-                                      uint8_t* out)
+__global__ void
+ed25519_scalar_double_kernel(const uint8_t* packets,
+                             uint32_t* signature_offsets,
+                             uint8_t* out,
+                             ge_cached* Ai,
+                             size_t num_keys,
+                             uint8_t* h) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < num_keys && (0 != out[i])) {
+        uint32_t signature_offset = signature_offsets[i];
+        out[i] = ed25519_verify_scalar_double(&packets[signature_offset],
+                                              &h[i * SHA512_SIZE],
+                                              &Ai[i * GE_LOOKUP_SIZE]
+                                              );
+    }
+}
+
+__global__ void
+ed25519_gen_lookup_kernel(const uint8_t* packets,
+                          uint32_t* public_key_offsets,
+                          ge_cached* Ai,
+                          size_t num_keys,
+                          uint8_t* out
+) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < num_keys && (0 != out[i])) {
+        uint32_t public_key_offset = public_key_offsets[i];
+        out[i] = ge_gen_lookup(&packets[public_key_offset], &Ai[i * GE_LOOKUP_SIZE]);
+    }
+}
+
+__global__ void
+ed25519_verify_kernel(const uint8_t* packets,
+                      uint32_t message_size,
+                      uint32_t* message_lens,
+                      uint32_t* public_key_offsets,
+                      uint32_t* signature_offsets,
+                      uint32_t* message_start_offsets,
+                      size_t num_keys,
+                      uint8_t* out,
+                      uint8_t* h)
 {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i < num_keys) {
@@ -178,7 +225,9 @@ __global__ void ed25519_verify_kernel(const uint8_t* packets,
         out[i] = ed25519_verify_device(&packets[signature_offset],
                                        &packets[message_start_offset],
                                        message_len,
-                                       &packets[public_key_offset]);
+                                       &packets[public_key_offset],
+                                       &h[i * SHA512_SIZE]
+                                       );
     }
 }
 
@@ -252,7 +301,27 @@ void ed25519_verify_many(const gpu_Elems* elems,
                              cur_ctx->signature_offsets,
                              cur_ctx->message_start_offsets,
                              cur_ctx->offsets_len,
-                             cur_ctx->out);
+                             cur_ctx->out,
+                             cur_ctx->h
+                             );
+    CUDA_CHK(cudaPeekAtLastError());
+
+    ed25519_gen_lookup_kernel<<<num_blocks, num_threads_per_block, 0, stream>>>
+                             (cur_ctx->packets,
+                              cur_ctx->public_key_offsets,
+                              cur_ctx->Ai,
+                              cur_ctx->offsets_len,
+                              cur_ctx->out
+                             );
+    CUDA_CHK(cudaPeekAtLastError());
+
+    ed25519_scalar_double_kernel<<<num_blocks, num_threads_per_block, 0, stream>>>
+                             (cur_ctx->packets,
+                              cur_ctx->signature_offsets,
+                              cur_ctx->out,
+                              cur_ctx->Ai,
+                              cur_ctx->offsets_len,
+                              cur_ctx->h);
     CUDA_CHK(cudaPeekAtLastError());
 
     cudaError_t err = cudaMemcpyAsync(out, cur_ctx->out, out_size, cudaMemcpyDeviceToHost, stream);

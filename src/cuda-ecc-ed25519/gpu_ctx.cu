@@ -107,6 +107,12 @@ void setup_gpu_ctx(verify_ctx_t* cur_ctx,
     }
 
     if (cur_ctx->public_key_offsets == NULL || cur_ctx->offsets_len < total_signatures) {
+        CUDA_CHK(cudaFree(cur_ctx->Ai));
+        CUDA_CHK(cudaMalloc(&cur_ctx->Ai, total_signatures * sizeof(ge_cached) * GE_LOOKUP_SIZE));
+
+        CUDA_CHK(cudaFree(cur_ctx->h));
+        CUDA_CHK(cudaMalloc(&cur_ctx->h, total_signatures * SHA512_SIZE));
+
         CUDA_CHK(cudaFree(cur_ctx->public_key_offsets));
         CUDA_CHK(cudaMalloc(&cur_ctx->public_key_offsets, offsets_size));
 

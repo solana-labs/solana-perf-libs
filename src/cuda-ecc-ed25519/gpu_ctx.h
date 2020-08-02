@@ -3,6 +3,7 @@
 
 #include <inttypes.h>
 #include "ed25519.h"
+#include "ge.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -12,6 +13,8 @@ typedef struct {
     uint8_t* packets;
     uint32_t packets_size_bytes;
 
+    ge_cached* Ai;
+    uint8_t* h;
     uint8_t* out;
     size_t out_size_bytes;
 
