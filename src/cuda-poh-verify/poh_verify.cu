@@ -22,8 +22,7 @@ __global__ void poh_verify_kernel(uint8_t* hashes, uint64_t* num_hashes_arr, siz
         sha256_init(&sha_state);
         sha256_process(&sha_state, hash, SHA256_BLOCK_SIZE);
         sha256_done(&sha_state, hash);
-    }
-
+    }  
     memcpy(&hashes[idx * SHA256_BLOCK_SIZE], hash, SHA256_BLOCK_SIZE);
 }
 
@@ -73,6 +72,11 @@ bool poh_init() {
 }
 
 extern "C" {
+
+void poh_verify_many_set_verbose(bool val) {
+    g_verbose = val;
+}
+
 int poh_verify_many(uint8_t* hashes,
                     const uint64_t* num_hashes_arr,
                     size_t num_elems,
@@ -132,7 +136,6 @@ int poh_verify_many(uint8_t* hashes,
     CUDA_CHK(cudaPeekAtLastError());
 
     CUDA_CHK(cudaMemcpyAsync(hashes, cur_ctx->hashes, hashes_size, cudaMemcpyDeviceToHost, stream));
-
     CUDA_CHK(cudaStreamSynchronize(stream));
 
     pthread_mutex_unlock(&cur_ctx->mutex);

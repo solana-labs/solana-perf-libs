@@ -200,3 +200,55 @@ int cuda_host_unregister(void* ptr)
 {
     return 0;
 }
+
+static int
+get_checked_scalar(unsigned char* scalar, const unsigned char* signature) {
+    // Check if top 4-bits are clear
+    // then scalar is reduced.
+    // if ((signature[31] & 0xf0) == 0) {
+    //     for (int i = 0; i < 32; i++) {
+    //         scalar[i] = signature[i];
+    //     }
+    //     return 0;
+    // }
+
+    // if ((signature[31] >> 7) != 0) {
+    //     return 1;
+    // }
+
+    // scalar32_reduce(scalar);
+    // if (!consttime_equal(scalar, signature)) {
+    //     return 1;
+    // }
+    fprintf(stderr, "get_checked_scalar not implemented.\n");
+    exit(1);
+    return 0;
+
+}
+
+int ed25519_get_checked_scalar(unsigned char* out_scalar, const unsigned char* in_scalar) {
+    return get_checked_scalar(out_scalar, in_scalar);
+}
+
+// Return 0=success if ge unpacks and is not small order
+static int
+check_packed_ge_small_order(const unsigned char* packed_group_element) {
+    // ge_p3 signature_R;
+
+    // fail if ge does not unpack
+    // if (0 != ge_frombytes_negate_vartime(&signature_R, packed_group_element)) {
+    //     return 1;
+    // }
+
+    // // fail if ge is small order
+    // if (0 != ge_is_small_order(&signature_R)) {
+    //     return 1;
+    // }
+    fprintf(stderr, "check_packed_ge_small_order not implemented.\n");
+    exit(1);
+    return 0;
+}
+
+int ed25519_check_packed_ge_small_order(const unsigned char* packed_group_element) {
+    return check_packed_ge_small_order(packed_group_element);
+}

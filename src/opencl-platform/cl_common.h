@@ -16,6 +16,11 @@ using namespace std;
 #define __host__
 #endif
 
+/* this is to silent warnings about opencl version (without this Werror flag will prevent compiling)*/
+#ifndef CL_TARGET_OPENCL_VERSION
+#define CL_TARGET_OPENCL_VERSION 120
+#endif
+
 extern bool g_verbose;
 
 #define LOG(...) if (g_verbose) { printf(__VA_ARGS__); }
