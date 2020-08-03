@@ -604,15 +604,14 @@ static __constant ulong32 K[64] = {
 };
 #endif
 
-/* Various logical functions */
 #define Ch(x,y,z)       (z ^ (x & (y ^ z)))
 #define Maj(x,y,z)      (((x | y) & z) | (x & y))
-#define S(x, n)         ROR64c((x),(n))
-#define R(x, n)           (((((ulong)x) & ((ulong)0xFFFFFFFFFFFFFFFFUL))) >> ((ulong)n))
-#define Sigma0(x)       (S(x, 28) ^ S(x, 34) ^ S(x, 39))
-#define Sigma1(x)       (S(x, 14) ^ S(x, 18) ^ S(x, 41))
-#define Gamma0(x)       (S(x, 1) ^ S(x, 8) ^ R(x, 7))
-#define Gamma1(x)       (S(x, 19) ^ S(x, 61) ^ R(x, 6))
+#define S(x, n)         RORc((x),(n))
+#define R(x, n)         (((x)&0xFFFFFFFFUL)>>(n))
+#define Sigma0(x)       (S(x, 2) ^ S(x, 13) ^ S(x, 22))
+#define Sigma1(x)       (S(x, 6) ^ S(x, 11) ^ S(x, 25))
+#define Gamma0(x)       (S(x, 7) ^ S(x, 18) ^ R(x, 3))
+#define Gamma1(x)       (S(x, 17) ^ S(x, 19) ^ R(x, 10))
 #ifndef MIN
    #define MIN(x, y) ( ((x)<(y))?(x):(y) )
 #endif
@@ -642,7 +641,7 @@ static int sha256_compress(hash_state * md, const unsigned char *buf)
 
     /* fill W[16..63] */
     for (i = 16; i < 64; i++) {
-        W[i] += Gamma1(W[i - 2]) + W[i - 7] + Gamma0(W[i - 15]) + W[i - 16];
+        W[i] = Gamma1(W[i - 2]) + W[i - 7] + Gamma0(W[i - 15]) + W[i - 16];
     }
 
     /* Compress */
@@ -738,6 +737,7 @@ static int sha256_compress(hash_state * md, const unsigned char *buf)
     for (i = 0; i < 8; i++) {
         md->sha256.state[i] = md->sha256.state[i] + S[i];
     }
+
     return CRYPT_OK;
 }
 
@@ -4266,7 +4266,6 @@ __kernel void poh_verify_kernel(__global uint8_t* hashes,
     for(int i = 0; i < SHA256_BLOCK_SIZE; i++) {
         hash[i] = hashes[idx * SHA256_BLOCK_SIZE + i];
     }
-    
 
     for (size_t i = 0; i < num_hashes_arr[idx]; i++) {
         hash_state sha_state;

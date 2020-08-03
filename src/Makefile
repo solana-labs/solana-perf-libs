@@ -13,8 +13,10 @@ V=debug
 include gpu-common.mk
 
 ECC_TEST_BIN=cuda_ed25519_verify
+POH_VERIFY_MANY_TEST_BIN=cuda_poh_verify_many
 LIB=cuda-crypt
 
+CL_POH_VERIFY_MANY_TEST_BIN=cl_poh_verify_many
 CL_ECC_TEST_BIN=cl_ed25519_verify
 CL_LIB=cl-crypt
 
@@ -24,6 +26,8 @@ CUDA_HEADER_DIR:=cuda-headers
 CUDA_SHA256_DIR:=cuda-sha256
 
 CUDA_DIR ?= /usr/local/cuda
+
+POH_VERIFY_TEST_DIR=poh-verify-test
 
 CXX ?= g++
 
@@ -39,11 +43,14 @@ CL_CFLAGS_debug:=$(CL_CFLAGS_common) -O0 -g
 CL_CFLAGS:=$(CL_CFLAGS_$V)
 
 all: $(V)/$(ECC_TEST_BIN) \
+     $(V)/$(POH_VERIFY_MANY_TEST_BIN) \
      $(V)/$(CL_ECC_TEST_BIN) \
+	 $(V)/$(CL_POH_VERIFY_MANY_TEST_BIN) \
      $(V)/lib$(LIB).so \
      $(V)/lib$(CL_LIB).so
 
 ECC_DIR:=cuda-ecc-ed25519
+POH_VERIFY_MANY_DIR:=cuda-poh-verify
 
 KEYPAIR_SRCS:=$(addprefix $(ECC_DIR)/,keypair.cu ed25519.h ge.h)
 $V/keypair.o: $(KEYPAIR_SRCS)
@@ -112,7 +119,14 @@ $V/cl_ecc_main.o: $(CL_ECC_DIR)/main.cpp $(ECC_DIR)/ed25519.h
 	@mkdir -p $(@D)
 	$(CXX) $(CL_CFLAGS) -pthread -I$(ECC_DIR) -c $< -o $@
 
+$V/poh_many_main.o: $(POH_VERIFY_TEST_DIR)/main.cpp
+	@mkdir -p $(@D)
+	$(CXX) $(CL_CFLAGS) -pthread -I$(ECC_DIR) -c $< -o $@
+
 $V/$(CL_ECC_TEST_BIN): $V/cl_ecc_main.o $V/lib$(CL_LIB).so
+	$(CXX) $(CL_CFLAGS) -L$(CUDA_DIR)/lib64 -L$V -pthread $< -l$(CL_LIB) -lOpenCL -o $@
+
+$V/$(CL_POH_VERIFY_MANY_TEST_BIN): $V/poh_many_main.o $V/lib$(CL_LIB).so
 	$(CXX) $(CL_CFLAGS) -L$(CUDA_DIR)/lib64 -L$V -pthread $< -l$(CL_LIB) -lOpenCL -o $@
 
 CPU_GPU_OBJS=$(addprefix $V/,verify.o poh_verify.o gpu_ctx.o sign.o seed.o keypair.o)
@@ -129,6 +143,10 @@ $V/ecc_main.o: $(addprefix $(ECC_DIR)/,main.cu ed25519.h)
 
 $V/$(ECC_TEST_BIN): $V/ecc_main.o $V/lib$(LIB).so
 	$(NVCC) $(CFLAGS) -L$V -l$(LIB) $< -o $@
+
+$V/$(POH_VERIFY_MANY_TEST_BIN): $V/poh_many_main.o $V/lib$(LIB).so
+	$(NVCC) $(CFLAGS) -L$V -l$(LIB) $< -o $@
+
 
 .PHONY:clean
 clean:
