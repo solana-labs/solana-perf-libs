@@ -13,7 +13,8 @@ $ make -j$(nproc)
 ```
 
 This should generate the libraries:
-* libcuda-crypt.so - ed25519 verify (used by leaders) and chacha (used by validators) cuda implementations
+* libcuda-crypt.so - ed25519 verify and poh verify cuda implementations
+* libcl-crypt.so - ed25519 verify and poh verify OpenCL implementations
 
 Copy libraries to the main Solana repo:
 ```bash
