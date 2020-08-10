@@ -148,7 +148,7 @@ int main(int argc, const char* argv[]) {
 
     if (argc == 1 || argc == 2) {
         printf("usage 1: %s [-v] [-save_output] generate <nr_elements> <nr_inputs>\n", argv[0]);
-        printf("usage 2: %s [-v] [-save_output] <file_num_hashes> <file_num_hashes_arr> <file_num_elems>\n", argv[0]);
+        printf("usage 2: %s [-v] [-save_output] [-check_result] <file_num_hashes> <file_num_hashes_arr> <file_num_elems>\n", argv[0]);
         printf("usage: argc is %i \n", argc);
         return 1;
     }
@@ -156,12 +156,17 @@ int main(int argc, const char* argv[]) {
     int arg = 1;
     bool verbose = false;
     bool save_output_file = false;
+    bool check_result = false;
     if (0 == strcmp(argv[arg], "-v")) {
         verbose = true;
         arg++;
     }
     if (0 == strcmp(argv[arg], "-save_output")) {
         save_output_file = true;
+        arg++;
+    }
+    if (0 == strcmp(argv[arg], "-check_result")) {
+        check_result = true;
         arg++;
     }
 
@@ -171,7 +176,7 @@ int main(int argc, const char* argv[]) {
         ++arg;
         if ((argc - arg) != 2) {
             printf("usage 1: %s [-v] [-save_output] generate <nr_elements> <nr_inputs>\n", argv[0]);
-            printf("usage 2: %s [-v] [-save_output] <file_num_hashes> <file_num_hashes_arr> <file_num_elems>\n", argv[0]);
+            printf("usage 2: %s [-v] [-save_output] [-check_result] <file_num_hashes> <file_num_hashes_arr> <file_num_elems>\n", argv[0]);
             printf("usage: argc is %i \n", argc);
             return 1;
         }
@@ -251,7 +256,7 @@ int main(int argc, const char* argv[]) {
     else {
         if ((argc - arg) != 3) {
             printf("usage 1: %s [-v] [-save_output] generate <nr_elements>\n", argv[0]);
-            printf("usage 2: %s [-v] [-save_output] <file_num_hashes> <file_num_hashes_arr> <file_num_elems>\n", argv[0]);
+            printf("usage 2: %s [-v] [-save_output] [-check_result] <file_num_hashes> <file_num_hashes_arr> <file_num_elems> \n", argv[0]);
             printf("usage: argc is %i \n", argc);
             return 1;
         }
@@ -269,6 +274,57 @@ int main(int argc, const char* argv[]) {
         if (save_output_file) {
             save_out(input_result->hashes, input_result->num_elems, 0);
         }
+
+        if (check_result) {
+            FILE * fp;
+            fp = fopen(argv[arg+2], "r");
+
+            if (fp == NULL) {
+                fprintf(stderr, "Could not open file %s\n", argv[arg+2]);
+                exit(-1);
+            }
+
+            FILE * fp2;
+            const char* file_with_results = "..//poh-verify-test//test_hashes_output_332";
+            fp2 = fopen(file_with_results, "r");
+
+            if (fp2 == NULL) {
+                fprintf(stderr, "Could not open file %s\n", file_with_results);
+                exit(-1);
+            }
+
+            size_t num_elems;
+            DIE( 0 == fscanf(fp, "%zu", &num_elems), "Error while reading num_elems from file");
+            fprintf(stderr, "num_elems read from file %s is %zu\n", argv[arg+2], num_elems);
+
+            uint8_t* test_result_hashes = (uint8_t*)calloc(input_result->num_elems, sizeof(uint8_t));
+            DIE(test_result_hashes == NULL, "Error while allocating test_result_hashes");
+
+            size_t i = 0;
+            for (i=0; i < num_elems; ++i) {
+                if( 0 == fscanf(fp2, "%hhu", &test_result_hashes[i])) {
+                    fprintf(stderr, "Error while reading hashes from file %s at index %lu \n", file_with_results, i);
+                    exit(-2);
+                }
+            }
+
+            for (i=0; i < num_elems; ++i) {
+                if (test_result_hashes[i] != input_result->hashes[i]) {
+                    fprintf(stderr, "Different result detected at index %lu of %lu  actual result: %hhu expected: %hhu \n TEST FAILED", 
+                        i, num_elems, input_result->hashes[i], test_result_hashes[i]);
+                    break;
+                }
+            }
+
+            if (num_elems == i) {
+                printf("TEST PASSED num_elems %lu\n", num_elems);
+            }
+            free(test_result_hashes);
+            fclose(fp);
+            fclose(fp2);
+        }
+
+
         free_input_poh(&input_result);
     }
 

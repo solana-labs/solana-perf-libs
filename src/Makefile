@@ -152,7 +152,10 @@ $V/$(POH_VERIFY_MANY_TEST_BIN): $V/poh_many_main.o $V/lib$(LIB).so
 clean:
 	rm -rf $V
 
-test: $V/$(ECC_TEST_BIN)
-	cd $(V) && ./$(ECC_TEST_BIN) 1 1 1 1 1 1
-	cd $(V) && ./$(ECC_TEST_BIN) 64 1 1 1 1 0
-	cd $(V) && ./$(ECC_TEST_BIN) 100201 1 1 4 10 1
+
+test: $V/$(ECC_TEST_BIN) $V/$(POH_VERIFY_MANY_TEST_BIN) $V/$(CL_POH_VERIFY_MANY_TEST_BIN)
+	cd $(V) && LD_LIBRARY_PATH=. ./$(POH_VERIFY_MANY_TEST_BIN) -check_result ../$(POH_VERIFY_TEST_DIR)/test_hashes_332_129 ../$(POH_VERIFY_TEST_DIR)/test_num_hashes_arr_332 ../$(POH_VERIFY_TEST_DIR)/test_num_elems_332
+	cd $(V) && LD_LIBRARY_PATH=. ./$(CL_POH_VERIFY_MANY_TEST_BIN) -check_result ../$(POH_VERIFY_TEST_DIR)/test_hashes_332_129 ../$(POH_VERIFY_TEST_DIR)/test_num_hashes_arr_332 ../$(POH_VERIFY_TEST_DIR)/test_num_elems_332
+	cd $(V) && LD_LIBRARY_PATH=. ./$(ECC_TEST_BIN) 1 1 1 1 1 1
+	cd $(V) && LD_LIBRARY_PATH=. ./$(ECC_TEST_BIN) 64 1 1 1 1 0
+	cd $(V) && LD_LIBRARY_PATH=. ./$(ECC_TEST_BIN) 100201 1 1 4 10 1

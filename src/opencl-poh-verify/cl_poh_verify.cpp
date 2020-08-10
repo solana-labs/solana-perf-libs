@@ -4,12 +4,14 @@
 #include <stdio.h>
 #include <inttypes.h>
 #include <pthread.h>
+
+#include "../opencl-platform/cl_common.h"
 #if __APPLE__
    #include <OpenCL/opencl.h>
 #else
    #include <CL/cl.h>
 #endif
-#include "../opencl-platform/cl_common.h"
+
 #include "perftime.h"
 
 #define MAX_NUM_GPUS 	1
