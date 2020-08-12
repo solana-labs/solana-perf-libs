@@ -31,7 +31,11 @@ int ed25519_create_seed(unsigned char *seed) {
         return 1;
     }
 
-    fread(seed, 1, 32, f);
+    size_t ret = fread(seed, 1, 32, f);
+    if (ret != 32) {
+        fprintf(stderr, "Seed read error");
+        return 1;
+    }
     fclose(f);
 #endif
 #endif
