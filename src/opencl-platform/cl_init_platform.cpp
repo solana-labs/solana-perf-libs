@@ -9,6 +9,10 @@
 #include "cl_common.h"
 
 cl_uint query_device_type = CL_DEVICE_TYPE_ALL;
+
+cl_uint query_platform_id = 0;
+cl_uint query_device_id = 0;
+
 bool cl_is_init = false;
 
 cl_context context;
@@ -230,6 +234,8 @@ bool cl_check_init(void) {
     CL_ERR( clGetPlatformIDs(platform_num, platform_list, NULL));
     cout << "Platforms found: " << platform_num << endl;
 
+    bool dev_selected = false;
+
     /* list all platforms and VENDOR/VERSION properties */
     for (cl_uint platf = 0; platf < platform_num; platf++) {
         /* get attribute CL_PLATFORM_VENDOR */
@@ -288,19 +294,22 @@ bool cl_check_init(void) {
                 attr_size, attr_data, NULL));
             cout << "\tDevice " << dev << " " << attr_data << " ";
 
-            /* select device based on cli arguments */
             string tmpAttrData = attr_data;
 
-            // always select first device of first platform            
-            if((dev == 0) && (platf == 0)) {
+            /* select device based on cli arguments or defaults (0, 0) */        
+            if((dev == query_device_id) && 
+                (platf == query_platform_id)) {
                 device = device_list[dev];
                 cout << "<----- SELECTED";
+                dev_selected = true;
             }
 
             delete[] attr_data;
             cout << endl;
         }
     }
+
+    DIE(dev_selected == false, "no platform or device selected");
 
     // clean
     delete[] platform_list;
@@ -321,7 +330,7 @@ bool cl_check_init(void) {
     *************************************************/
     
 #ifdef KERNELS_SHA256
-    cout << "Compiling sha256 kernels" << endl;
+    cout << "Compiling sha256 kernels, FLAGS: " << CL_DEVICE_CFLAGS << endl;
 
     /* retrieve kernel source */
     kernel_src = kernels_sha256_src;
@@ -334,7 +343,7 @@ bool cl_check_init(void) {
     CL_ERR( ret );
 
     /* compile the program for the given set of devices */
-    ret = clBuildProgram(program, 1, &device, "-DENDIAN_NEUTRAL -DLTC_NO_ASM", NULL, NULL);
+    ret = clBuildProgram(program, 1, &device, CL_DEVICE_CFLAGS, NULL, NULL);
     CL_COMPILE_ERR( ret, program, device );
     
     init_sha256_state_kernel = clCreateKernel(program, "init_sha256_state_kernel", &ret);
@@ -349,7 +358,7 @@ bool cl_check_init(void) {
     *************************************************/
     
 #ifdef KERNELS_PRECOMP_DATA
-    cout << "Compiling verify kernels" << endl;
+    cout << "Compiling verify kernels, FLAGS: " << CL_DEVICE_CFLAGS << endl;
     
     /* retrieve kernel source */
     kernel_src = kernels_precomp_data_src;
@@ -363,7 +372,7 @@ bool cl_check_init(void) {
     CL_ERR( ret );
 
     /* compile the program for the given set of devices */
-    ret = clBuildProgram(program, 1, &device, "-DENDIAN_NEUTRAL -DLTC_NO_ASM", NULL, NULL);
+    ret = clBuildProgram(program, 1, &device, CL_DEVICE_CFLAGS, NULL, NULL);
     CL_COMPILE_ERR( ret, program, device );
     
 	ed25519_sign_kernel = clCreateKernel(program, "ed25519_sign_kernel", &ret);
