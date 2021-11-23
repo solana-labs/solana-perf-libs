@@ -59,3 +59,4 @@ upload-ci-artifact solana-perf.tgz
 [[ -n $CI_TAG ]] || exit 0
 ci/upload-github-release-asset.sh solana-perf.tgz
 exit 0
+
