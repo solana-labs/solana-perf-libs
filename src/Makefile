@@ -20,7 +20,7 @@ CL_POH_VERIFY_MANY_TEST_BIN=cl_poh_verify_many
 CL_ECC_TEST_BIN=cl_ed25519_verify
 CL_LIB=cl-crypt
 
-CL_HEADER_DIR:=opencl-platform
+CL_PLATFORM_DIR:=opencl-platform
 
 CUDA_HEADER_DIR:=cuda-headers
 CUDA_SHA256_DIR:=cuda-sha256
@@ -34,9 +34,14 @@ CXX ?= g++
 CFLAGS_COMMON:=-DENDIAN_NEUTRAL -DLTC_NO_ASM
 CFLAGS+=$(CFLAGS_COMMON) -I$(CUDA_HEADER_DIR) -I$(CUDA_SHA256_DIR)
 
+# some instances require optimisations disabled (e.g. AMD on Linux)
+# remove "-cl-opt-disable" for default Optimisations to take place
+CL_DEVICE_CFLAGS=-cl-opt-disable -DENDIAN_NEUTRAL -DLTC_NO_ASM
+
 #use -DUSE_RDTSC for Windows compilation
 CL_CFLAGS_common:=-fPIC -std=c++11 $(CFLAGS_COMMON) -DOPENCL_VARIANT \
-		  -I$(CL_HEADER_DIR) -Icommon/ \
+		  -DCL_DEVICE_CFLAGS="\"$(CL_DEVICE_CFLAGS)\"" \
+		  -I$(CL_PLATFORM_DIR) -Icommon/ \
 		  -I$(CUDA_DIR)/targets/x86_64-linux/include $(HOST_CFLAGS)
 CL_CFLAGS_release:=$(CL_CFLAGS_common) -O3
 CL_CFLAGS_debug:=$(CL_CFLAGS_common) -O0 -g

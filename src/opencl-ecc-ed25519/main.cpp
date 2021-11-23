@@ -102,14 +102,14 @@ int main(int argc, const char* argv[]) {
         }
     }
 
-    if ((argc - arg) != 6) {
-        printf("usage: %s [-v] <num_signatures> <num_elems> <num_sigs_per_packet> <num_threads> <num_iterations> <use_non_default_stream>\n", argv[0]);
+    if ((argc - arg) < 6 || (argc - arg) > 8) {
+        printf("usage: %s [-v] <num_signatures> <num_elems> "
+        "<num_sigs_per_packet> <num_threads> <num_iterations> "
+        "<use_non_default_stream> <cl_platform_id> <cl_device_id>\n", argv[0]);
         return 1;
     }
 
     ed25519_set_verbose(verbose);
-	
-	DIE(cl_check_init(CL_DEVICE_TYPE_GPU) == false, "OpenCL could not be init");
 
     int num_signatures_per_elem = strtol(argv[arg++], NULL, 10);
     if (num_signatures_per_elem <= 0) {
@@ -146,6 +146,18 @@ int main(int argc, const char* argv[]) {
         printf("non_default_stream should be 0 or 1! %d\n", use_non_default_stream);
         return 1;
     }
+
+    if(argc >= 8) {
+	    query_platform_id = stoi(argv[arg++], NULL, 10);
+    }
+
+    if(argc >= 9) {
+        query_device_id = stoi(argv[arg++], NULL, 10);
+    }
+
+
+    DIE(cl_check_init() == false, "OpenCL could not be init");
+    LOG("OpenCL init has finished\n");
 
     LOG("streamer size: %zu elems size: %zu\n", sizeof(streamer_Packet), sizeof(gpu_Elems));
 
@@ -333,14 +345,17 @@ int main(int argc, const char* argv[]) {
 
     for (int thread = 0; thread < num_threads; thread++) {
         LOG("ret:\n");
+        int verify_ok = out_size / (int)sizeof(uint8_t);
         bool verify_failed = false;
         for (int i = 0; i < out_size / (int)sizeof(uint8_t); i++) {
             if (vctx[thread].out_h[i] != 1) {
                 verify_failed = true;
+                verify_ok--;
             }
         }
         LOG("\n");
         fflush(stdout);
+        printf("Verify OK: %d / %d\n", verify_ok, out_size / (int)sizeof(uint8_t));
         assert(verify_failed == false);
     }
 
