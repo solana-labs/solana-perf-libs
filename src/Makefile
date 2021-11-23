@@ -135,7 +135,7 @@ $V/crypt-dlink.o: $(CPU_GPU_OBJS)
 	$(NVCC) -Xcompiler "-fPIC" $(CFLAGS) --device-link $^ --output-file $@
 
 $V/lib$(LIB).so: $V/crypt-dlink.o $(CPU_GPU_OBJS)
-	$(NVCC) -Xcompiler "-fPIC" --shared --output-file $@ $^
+	$(NVCC) -Xcompiler "-fPIC" $(GPU_CFLAGS) --shared --output-file $@ $^
 
 $V/ecc_main.o: $(addprefix $(ECC_DIR)/,main.cu ed25519.h)
 	@mkdir -p $(@D)
