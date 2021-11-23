@@ -3,4 +3,4 @@ steps:
     name: "build"
     timeout_in_minutes: 35
     agents:
-      - "queue=cuda"
+      - "sol-perf=true"
