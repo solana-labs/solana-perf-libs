@@ -6,9 +6,11 @@ source ci/env.sh
 source ci/upload-ci-artifact.sh
 
 CUDA_HOMES=(
-  /usr/local/cuda-10.0
-  /usr/local/cuda-10.1
-  /usr/local/cuda-10.2
+  /usr/local/cuda-11.1
+  /usr/local/cuda-11.2
+  /usr/local/cuda-11.3
+  /usr/local/cuda-11.4
+  /usr/local/cuda-11.5
 )
 
 for CUDA_HOME in "${CUDA_HOMES[@]}"; do
