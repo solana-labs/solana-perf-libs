@@ -151,7 +151,7 @@ void cl_get_compiler_err_log(cl_program program, cl_device_id device)
     build_log[ log_size ] = '\0';
     cout << endl << build_log << endl;
 	
-	delete build_log;
+	delete[] build_log;
 }
 
 /**
